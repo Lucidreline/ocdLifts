@@ -49,8 +49,9 @@ const NewExerciseForm = () => {
         reps: null,
         resistanceWeight: null,
         resistanceHeight: null,
+        lastUpdated: new Date().toISOString(),
       },
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     };
 
     try {

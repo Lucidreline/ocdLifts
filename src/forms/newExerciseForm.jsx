@@ -1,4 +1,4 @@
-// src/pages/ExercisesPage.jsx
+// src/forms/NewExerciseForm.jsx
 import React, { useState } from "react";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
@@ -36,13 +36,23 @@ const NewExerciseForm = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((fd) => ({ ...fd, [name]: value }));
+    // clear dependent fields if parent is reset
+    if (name === "primaryMuscleGroup") {
+      setFormData((fd) => ({
+        ...fd,
+        secondaryMuscleGroup: "",
+        thirdMuscleGroup: "",
+      }));
+    }
+    if (name === "secondaryMuscleGroup") {
+      setFormData((fd) => ({ ...fd, thirdMuscleGroup: "" }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
 
-    // include an empty PR object
     const payload = {
       ...formData,
       pr: {
@@ -56,7 +66,6 @@ const NewExerciseForm = () => {
 
     try {
       await addDoc(collection(db, "exercises"), payload);
-      // reset form
       setFormData({
         name: "",
         variation: "",
@@ -65,10 +74,8 @@ const NewExerciseForm = () => {
         thirdMuscleGroup: "",
         category: "",
       });
-      // optionally show a success toast/alert
     } catch (err) {
       console.error("Error saving exercise:", err);
-      // optionally show an error message
     } finally {
       setIsSaving(false);
     }
@@ -103,34 +110,64 @@ const NewExerciseForm = () => {
           </div>
         </div>
 
-        {/* Muscle Groups */}
-        <div className="flex space-x-2">
-          {[
-            "primaryMuscleGroup",
-            "secondaryMuscleGroup",
-            "thirdMuscleGroup",
-          ].map((field, idx) => (
-            <div key={field} className="flex-1">
-              <label className="block mb-1">
-                {["Primary", "Secondary", "Third"][idx]} Muscle
-              </label>
-              <select
-                name={field}
-                value={formData[field]}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-                required={field === "primaryMuscleGroup"}
-              >
-                <option value="">— select —</option>
-                {muscleGroups.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
+        {/* Primary Muscle Group */}
+        <div>
+          <label className="block mb-1">Primary Muscle</label>
+          <select
+            name="primaryMuscleGroup"
+            value={formData.primaryMuscleGroup}
+            onChange={handleChange}
+            className="w-full p-2 border rounded"
+            required
+          >
+            <option value="">— select —</option>
+            {muscleGroups.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {/* Secondary Muscle Group (conditional) */}
+        {formData.primaryMuscleGroup && (
+          <div>
+            <label className="block mb-1">Secondary Muscle</label>
+            <select
+              name="secondaryMuscleGroup"
+              value={formData.secondaryMuscleGroup}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+            >
+              <option value="">— select —</option>
+              {muscleGroups.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Third Muscle Group (conditional) */}
+        {formData.secondaryMuscleGroup && (
+          <div>
+            <label className="block mb-1">Third Muscle</label>
+            <select
+              name="thirdMuscleGroup"
+              value={formData.thirdMuscleGroup}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+            >
+              <option value="">— select —</option>
+              {muscleGroups.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Category */}
         <div>

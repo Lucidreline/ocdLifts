@@ -1,5 +1,7 @@
 // src/pages/ExercisesPage.jsx
 import React, { useState } from "react";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../firebase/firebase";
 
 const muscleGroups = [
   "Chest",
@@ -20,7 +22,7 @@ const muscleGroups = [
 
 const categories = ["Push", "Pull", "Legs"];
 
-const NewExercisesForm = () => {
+const NewExerciseForm = () => {
   const [formData, setFormData] = useState({
     name: "",
     variation: "",
@@ -28,31 +30,47 @@ const NewExercisesForm = () => {
     secondaryMuscleGroup: "",
     thirdMuscleGroup: "",
     category: "",
-    pr: {
-      reps: "",
-      resistanceWeight: "",
-      resistanceHeight: "",
-    },
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((fd) => ({ ...fd, [name]: value }));
   };
 
-  const handlePrChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((fd) => ({
-      ...fd,
-      pr: { ...fd.pr, [name]: value },
-    }));
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: send formData to Firestore
-    console.log("submitting", formData);
-    // reset or give feedback...
+    setIsSaving(true);
+
+    // include an empty PR object
+    const payload = {
+      ...formData,
+      pr: {
+        reps: null,
+        resistanceWeight: null,
+        resistanceHeight: null,
+      },
+      createdAt: new Date(),
+    };
+
+    try {
+      await addDoc(collection(db, "exercises"), payload);
+      // reset form
+      setFormData({
+        name: "",
+        variation: "",
+        primaryMuscleGroup: "",
+        secondaryMuscleGroup: "",
+        thirdMuscleGroup: "",
+        category: "",
+      });
+      // optionally show a success toast/alert
+    } catch (err) {
+      console.error("Error saving exercise:", err);
+      // optionally show an error message
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -132,49 +150,18 @@ const NewExercisesForm = () => {
           </select>
         </div>
 
-        {/* PR Fields */}
-        <fieldset className="p-4 border rounded space-y-2">
-          <legend className="font-medium">Personal Record</legend>
-          <div className="flex space-x-2">
-            <input
-              type="number"
-              name="reps"
-              value={formData.pr.reps}
-              onChange={handlePrChange}
-              placeholder="Reps"
-              min="0"
-              className="flex-1 p-2 border rounded"
-            />
-            <input
-              type="number"
-              name="resistanceWeight"
-              value={formData.pr.resistanceWeight}
-              onChange={handlePrChange}
-              placeholder="Weight (lbs)"
-              min="0"
-              className="flex-1 p-2 border rounded"
-            />
-            <input
-              type="number"
-              name="resistanceHeight"
-              value={formData.pr.resistanceHeight}
-              onChange={handlePrChange}
-              placeholder="Height (inches)"
-              min="0"
-              className="flex-1 p-2 border rounded"
-            />
-          </div>
-        </fieldset>
-
         <button
           type="submit"
-          className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          disabled={isSaving}
+          className={`w-full py-2 text-white rounded ${
+            isSaving ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
-          Save Exercise
+          {isSaving ? "Saving…" : "Save Exercise"}
         </button>
       </form>
     </div>
   );
 };
 
-export default NewExercisesForm;
+export default NewExerciseForm;

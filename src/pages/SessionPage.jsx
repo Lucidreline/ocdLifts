@@ -1,4 +1,3 @@
-// src/pages/SessionPage.jsx
 import React, { useEffect, useState } from "react";
 import {
   doc,
@@ -12,7 +11,11 @@ import {
 } from "firebase/firestore";
 import { useParams } from "react-router-dom";
 import { db } from "../firebase/firebase";
+
 import NewSetForm from "../forms/newSetForm";
+
+// Session categories for dropdown
+const sessionCategories = ["Push", "Pull", "Legs"];
 
 const SessionPage = () => {
   const { sessionId } = useParams();
@@ -31,7 +34,7 @@ const SessionPage = () => {
   useEffect(() => {
     if (!session) return;
     (async () => {
-      if (session.set_ids.length === 0) return setSets([]);
+      if (!session.set_ids || session.set_ids.length === 0) return setSets([]);
       const q = query(
         collection(db, "sets"),
         where("__name__", "in", session.set_ids)
@@ -41,13 +44,26 @@ const SessionPage = () => {
     })();
   }, [session]);
 
+  const handleCategoryChange = async (e) => {
+    const newCat = e.target.value;
+    setSession((s) => ({ ...s, category: newCat }));
+    await updateDoc(doc(db, "sessions", sessionId), { category: newCat });
+  };
+
+  const handleNotesChange = async (e) => {
+    const newNotes = e.target.value;
+    setSession((s) => ({ ...s, session_notes: newNotes }));
+    await updateDoc(doc(db, "sessions", sessionId), {
+      session_notes: newNotes,
+    });
+  };
+
   // callback when a new set is created
   const handleNewSet = async (setId) => {
     await updateDoc(doc(db, "sessions", sessionId), {
       set_ids: arrayUnion(setId),
     });
-    // append locally
-    setSession((s) => ({ ...s, set_ids: [...s.set_ids, setId] }));
+    setSession((s) => ({ ...s, set_ids: [...(s.set_ids || []), setId] }));
   };
 
   if (!session) return <p>Loading session…</p>;
@@ -57,35 +73,36 @@ const SessionPage = () => {
       <h1 className="text-2xl">
         Session: {session.category || "Uncategorized"}
       </h1>
+
+      {/* Category dropdown */}
       <div>
         <label className="block mb-1">Category</label>
-        <input
-          value={session.category}
-          onChange={(e) =>
-            setSession((s) => ({ ...s, category: e.target.value }))
-          }
-          onBlur={async () => {
-            await updateDoc(doc(db, "sessions", sessionId), {
-              category: session.category,
-            });
-          }}
-        />
+        <select
+          value={session.category || ""}
+          onChange={handleCategoryChange}
+          className="w-full p-2 border rounded"
+        >
+          <option value="">— select —</option>
+          {sessionCategories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </select>
       </div>
+
+      {/* Notes textarea */}
       <div>
         <label className="block mb-1">Notes</label>
         <textarea
-          value={session.session_notes}
-          onChange={(e) =>
-            setSession((s) => ({ ...s, session_notes: e.target.value }))
-          }
-          onBlur={async () => {
-            await updateDoc(doc(db, "sessions", sessionId), {
-              session_notes: session.session_notes,
-            });
-          }}
+          value={session.session_notes || ""}
+          onChange={handleNotesChange}
+          className="w-full p-2 border rounded"
+          rows={3}
         />
       </div>
 
+      {/* Sets list */}
       <section>
         <h2 className="text-xl mb-2">Sets</h2>
         {sets.length === 0 ? (
@@ -109,7 +126,12 @@ const SessionPage = () => {
         )}
       </section>
 
-      <NewSetForm sessionId={sessionId} onCreated={handleNewSet} />
+      {/* New set form */}
+      <NewSetForm
+        sessionId={sessionId}
+        sessionCategory={session.category || ""}
+        onCreated={handleNewSet}
+      />
     </div>
   );
 };

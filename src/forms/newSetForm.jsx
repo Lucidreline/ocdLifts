@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { addDoc, collection } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
+import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
-const NewSetForm = ({ sessionId, onCreated }) => {
+const NewSetForm = ({ sessionId, sessionCategory, onCreated }) => {
   const [data, setData] = useState({
     rep_count: "",
     intensity: "",
@@ -11,11 +11,31 @@ const NewSetForm = ({ sessionId, onCreated }) => {
     resistanceHeight: "",
     set_notes: "",
   });
+  const [exercises, setExercises] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  // Fetch session category then load exercises matching that category
+  useEffect(() => {
+    // if no category yet, clear list
+    if (!sessionCategory) {
+      setExercises([]);
+      return;
+    }
+
+    (async () => {
+      // fetch only exercises matching the new category
+      const q = query(
+        collection(db, "exercises"),
+        where("category", "==", sessionCategory)
+      );
+      const snap = await getDocs(q);
+      setExercises(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    })();
+  }, [sessionCategory]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setData((d) => ({ ...d, [name]: value }));
+    setData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -30,6 +50,7 @@ const NewSetForm = ({ sessionId, onCreated }) => {
       };
       const docRef = await addDoc(collection(db, "sets"), payload);
       onCreated(docRef.id);
+      // reset form
       setData({
         rep_count: "",
         intensity: "",
@@ -39,24 +60,38 @@ const NewSetForm = ({ sessionId, onCreated }) => {
         set_notes: "",
       });
     } catch (err) {
-      console.error(err);
+      console.error("Error saving set:", err);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2 p-4 border-t">
-      <h3 className="text-lg">New Set</h3>
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          name="exerciseId"
-          placeholder="Exercise ID"
-          value={data.exerciseId}
-          onChange={handleChange}
-          required
-          className="p-2 border rounded"
-        />
+    <form onSubmit={handleSubmit} className="space-y-4 p-4 border-t">
+      <h3 className="text-lg font-medium">New Set</h3>
+
+      <div className="grid grid-cols-2 gap-3">
+        {/* Exercise selector filtered by session category */}
+        <div className="col-span-2">
+          <label className="block mb-1">Exercise</label>
+          <select
+            name="exerciseId"
+            value={data.exerciseId}
+            onChange={handleChange}
+            required
+            className="w-full p-2 border rounded"
+          >
+            <option value="">— select exercise —</option>
+            {exercises.map((ex) => (
+              <option key={ex.id} value={ex.id}>
+                {ex.name}
+                {ex.variation ? ` (${ex.variation})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Reps */}
         <input
           name="rep_count"
           type="number"
@@ -64,17 +99,21 @@ const NewSetForm = ({ sessionId, onCreated }) => {
           value={data.rep_count}
           onChange={handleChange}
           className="p-2 border rounded"
+          min="0"
         />
+        {/* Intensity */}
         <input
           name="intensity"
           type="number"
-          placeholder="Intensity (1–10)"
-          min="1"
-          max="10"
+          placeholder="Intensity 1–10"
           value={data.intensity}
           onChange={handleChange}
           className="p-2 border rounded"
+          min="1"
+          max="10"
         />
+
+        {/* Weight */}
         <input
           name="resistanceWeight"
           type="number"
@@ -83,6 +122,7 @@ const NewSetForm = ({ sessionId, onCreated }) => {
           onChange={handleChange}
           className="p-2 border rounded"
         />
+        {/* Height */}
         <input
           name="resistanceHeight"
           type="number"
@@ -91,6 +131,8 @@ const NewSetForm = ({ sessionId, onCreated }) => {
           onChange={handleChange}
           className="p-2 border rounded"
         />
+
+        {/* Notes */}
         <input
           name="set_notes"
           placeholder="Notes"
@@ -99,14 +141,15 @@ const NewSetForm = ({ sessionId, onCreated }) => {
           className="p-2 border rounded col-span-2"
         />
       </div>
+
       <button
         type="submit"
         disabled={saving}
-        className={`mt-2 px-4 py-2 text-white rounded ${
+        className={`w-full py-2 text-white rounded ${
           saving ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
         }`}
       >
-        {saving ? "Saving…" : "Add Set"}
+        {saving ? "Adding…" : "Add Set"}
       </button>
     </form>
   );

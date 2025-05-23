@@ -29,6 +29,7 @@ const SessionsPage = () => {
       category: "",
       session_notes: "",
       date: new Date().toISOString(),
+      body_weight: null,
       set_ids: [],
     };
     const docRef = await addDoc(collection(db, "sessions"), payload);

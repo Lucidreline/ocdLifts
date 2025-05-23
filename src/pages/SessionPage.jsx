@@ -1,3 +1,4 @@
+// src/pages/SessionPage.jsx
 import React, { useEffect, useState } from "react";
 import {
   doc,
@@ -73,6 +74,22 @@ const SessionPage = () => {
       <h1 className="text-2xl">
         Session: {session.category || "Uncategorized"}
       </h1>
+
+      <div>
+        <label className="block mb-1">Body Weight (lbs)</label>
+        <input
+          type="number"
+          step="any"
+          value={session.body_weight ?? ""}
+          placeholder="e.g. 195.5"
+          onChange={async (e) => {
+            const w = e.target.value === "" ? null : parseFloat(e.target.value);
+            setSession((s) => ({ ...s, body_weight: w }));
+            await updateDoc(doc(db, "sessions", sessionId), { body_weight: w });
+          }}
+          className="w-full p-2 border rounded"
+        />
+      </div>
 
       {/* Category dropdown */}
       <div>

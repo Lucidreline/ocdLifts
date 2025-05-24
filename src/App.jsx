@@ -5,6 +5,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ExercisePage from "./pages/ExercisesPage";
 import SessionsPage from "./pages/SessionsPage";
 import SessionPage from "./pages/SessionPage";
+import BulkPage from './pages/BulkPage';
 
 function App() {
   return (
@@ -16,6 +17,8 @@ function App() {
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/exercises" element={<ExercisePage />} />
       <Route path="/sessions" element={<SessionsPage />} />
+      <Route path="/bulk" element={<BulkPage />} />
+
 
       {/* Catch-all back to dashboard */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

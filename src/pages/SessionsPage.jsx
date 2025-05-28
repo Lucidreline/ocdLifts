@@ -43,6 +43,7 @@ const SessionsPage = () => {
         <button
           onClick={handleCreate}
           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          style={{ background: 'rgba(0,255,0,0.3)', outline: '2px solid red' }}
         >
           Create Session
         </button>

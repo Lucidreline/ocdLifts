@@ -4,16 +4,18 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
   collection,
   getDocs,
   query,
   where,
   arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { useParams } from "react-router-dom";
 import { db } from "../firebase/firebase";
 
-import NewSetForm from "../forms/newSetForm"; // (make sure this matches your actual path)
+import NewSetForm from "../forms/newSetForm";
 
 const sessionCategories = ["Push", "Pull", "Legs"];
 
@@ -24,7 +26,7 @@ const SessionPage = () => {
   const [prMessage, setPrMessage] = useState("");
   const [lastExerciseId, setLastExerciseId] = useState(null);
 
-  // 1) Load session metadata on mount
+  // Load session metadata on mount
   useEffect(() => {
     (async () => {
       const snap = await getDoc(doc(db, "sessions", sessionId));
@@ -43,7 +45,7 @@ const SessionPage = () => {
     })();
   }, [sessionId]);
 
-  // 2) Whenever the session object changes (especially set_ids), load & enrich all sets
+  // Load sets and fetch exercise names
   useEffect(() => {
     if (!session) return;
     const ids = session.set_ids || [];
@@ -51,18 +53,13 @@ const SessionPage = () => {
       setSets([]);
       return;
     }
-
     (async () => {
-      // 2a) Fetch all set documents whose ID is in session.set_ids
       const setQuery = query(collection(db, "sets"), where("__name__", "in", ids));
       const setSnap = await getDocs(setQuery);
       const setsData = setSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      // 2b) From those sets, gather unique exercise IDs
       const exIds = [...new Set(setsData.map((s) => s.exerciseId))];
-
-      // 2c) Fetch exercise docs in a single batch to get each name
-      const exMap = {}; // will map exerciseId → exerciseName
+      const exMap = {};
       if (exIds.length > 0) {
         const exQuery = query(collection(db, "exercises"), where("__name__", "in", exIds));
         const exSnap = await getDocs(exQuery);
@@ -72,18 +69,16 @@ const SessionPage = () => {
         });
       }
 
-      // 2d) Enrich each set with exerciseName, then sort by timestamp desc
       const enriched = setsData.map((s) => ({
         ...s,
         exerciseName: exMap[s.exerciseId] || "Unknown Exercise",
       }));
       enriched.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
       setSets(enriched);
     })();
   }, [session]);
 
-  // 3) Generic handler to update a single session field (category, notes, body_weight)
+  // Update a single session field
   const handleFieldUpdate = (field) => async (e) => {
     const raw = e.target.value;
     const value = e.target.type === "number" ? (raw === "" ? null : parseFloat(raw)) : raw;
@@ -91,22 +86,14 @@ const SessionPage = () => {
     await updateDoc(doc(db, "sessions", sessionId), { [field]: value });
   };
 
-  // 4) When a new set is created, detect/pr logic and add to session
+  // Add new set and detect PR
   const handleNewSet = async (setId) => {
-    // 4a) Add this set’s ID to the session.set_ids array
-    await updateDoc(doc(db, "sessions", sessionId), {
-      set_ids: arrayUnion(setId),
-    });
-    setSession((prev) => ({
-      ...prev,
-      set_ids: [...(prev.set_ids || []), setId],
-    }));
+    await updateDoc(doc(db, "sessions", sessionId), { set_ids: arrayUnion(setId) });
+    setSession((prev) => ({ ...prev, set_ids: [...(prev.set_ids || []), setId] }));
 
-    // 4b) Fetch the newly created set’s details:
     const setSnap = await getDoc(doc(db, "sets", setId));
     const { exerciseId, rep_count, intensity, resistanceWeight, resistanceHeight } = setSnap.data();
 
-    // 4c) Fetch the exercise’s current PR
     const exSnap = await getDoc(doc(db, "exercises", exerciseId));
     const exData = exSnap.data() || {};
     const currentPr = {
@@ -115,7 +102,6 @@ const SessionPage = () => {
       resistanceHeight: exData.pr?.resistanceHeight ?? 0,
     };
 
-    // 4d) Determine if the new set is a PR
     const hadNoPr = currentPr.reps === 0 && currentPr.resistanceWeight === 0 && currentPr.resistanceHeight === 0;
     const anyValue = rep_count > 0 || resistanceWeight > 0 || resistanceHeight > 0;
     let isPr = hadNoPr && anyValue;
@@ -125,21 +111,17 @@ const SessionPage = () => {
         resistanceWeight > currentPr.resistanceWeight &&
         rep_count === currentPr.reps &&
         resistanceHeight === currentPr.resistanceHeight;
-
       const isRepsPr =
         rep_count > currentPr.reps &&
         resistanceWeight === currentPr.resistanceWeight &&
         resistanceHeight === currentPr.resistanceHeight;
-
       const isHeightPr =
         resistanceHeight > currentPr.resistanceHeight &&
         rep_count === currentPr.reps &&
         resistanceWeight === currentPr.resistanceWeight;
-
       isPr = isWeightPr || isRepsPr || isHeightPr;
     }
 
-    // 4e) If it’s a PR, update both the exercise’s pr and the session’s pr_hit:
     if (isPr) {
       const newPr = {
         reps: rep_count,
@@ -155,19 +137,25 @@ const SessionPage = () => {
     }
   };
 
-  // 5) While session is loading, show a brief “Loading” message:
+  // Delete a set: remove from Firestore and from session.set_ids
+  const handleDeleteSet = async (setId) => {
+    // 1) Remove the document from "sets" collection
+    await deleteDoc(doc(db, "sets", setId));
+    // 2) Remove the setId from the session's set_ids array
+    await updateDoc(doc(db, "sessions", sessionId), { set_ids: arrayRemove(setId) });
+    // 3) Update local state: filter out the deleted set
+    setSets((prev) => prev.filter((s) => s.id !== setId));
+    setSession((prev) => ({ ...prev, set_ids: prev.set_ids.filter((id) => id !== setId) }));
+  };
+
   if (!session) return <p>Loading session…</p>;
 
   return (
     <div className="p-6 max-w-xl mx-auto space-y-6">
-      {/* Session header */}
       <h1 className="text-2xl">Session: {session.category || "Uncategorized"}</h1>
-
-      {/* PR banners */}
       {session.pr_hit && <div className="text-green-600 font-bold">🎉 PR Hit This Session!</div>}
       {prMessage && <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 rounded">{prMessage}</div>}
 
-      {/* Session fields: Body Weight, Category, Notes */}
       <div>
         <label className="block mb-1">Body Weight (lbs)</label>
         <input
@@ -179,7 +167,6 @@ const SessionPage = () => {
           className="w-full p-2 border rounded"
         />
       </div>
-
       <div>
         <label className="block mb-1">Category</label>
         <select
@@ -195,7 +182,6 @@ const SessionPage = () => {
           ))}
         </select>
       </div>
-
       <div>
         <label className="block mb-1">Notes</label>
         <textarea
@@ -206,7 +192,6 @@ const SessionPage = () => {
         />
       </div>
 
-      {/* NewSetForm: passes the lastExerciseId so it can default to that */}
       <NewSetForm
         sessionId={sessionId}
         sessionCategory={session.category}
@@ -215,7 +200,6 @@ const SessionPage = () => {
         onCreated={handleNewSet}
       />
 
-      {/* Sets list */}
       <section>
         <h2 className="text-xl mb-2">Sets</h2>
         {sets.length === 0 ? (
@@ -223,8 +207,7 @@ const SessionPage = () => {
         ) : (
           <ul className="space-y-4">
             {sets.map((s) => (
-              <li key={s.id} className="border p-2 rounded">
-                {/* Only show each field if it has a non-blank/nonnull value */}
+              <li key={s.id} className="border p-2 rounded space-y-1">
                 {s.exerciseName && <div>Exercise: {s.exerciseName}</div>}
                 {s.rep_count != null && <div>Reps: {s.rep_count}</div>}
                 {s.intensity != null && <div>Intensity: {s.intensity}</div>}
@@ -236,6 +219,12 @@ const SessionPage = () => {
                     {new Date(s.timestamp).toLocaleTimeString()}
                   </div>
                 )}
+                <button
+                  onClick={() => handleDeleteSet(s.id)}
+                  className="mt-1 text-red-600 hover:underline text-sm"
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>

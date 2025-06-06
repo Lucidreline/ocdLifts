@@ -435,19 +435,20 @@ const SessionPage = () => {
                   <div>
                     <div className="flex justify-between items-start">
                       <div>
+                        <br></br>
                         {s.exerciseName && (
                           <div>
-                            Exercise: {s.hit_pr ? "PR " + s.exerciseName : s.exerciseName}
+                            {s.hit_pr ? "PR! " + s.exerciseName : s.exerciseName}
                           </div>
                         )}
-                        {s.rep_count != null && <div>Reps: {s.rep_count}</div>}
+                        {s.rep_count != null && <div>{s.rep_count} Reps</div>}
                         {s.intensity != null && <div>Intensity: {s.intensity}</div>}
                         {s.resistanceWeight != null && <div>Weight: {s.resistanceWeight}</div>}
                         {s.resistanceHeight != null && <div>Height: {s.resistanceHeight}</div>}
                         {s.set_notes && <div>Notes: {s.set_notes}</div>}
                         {s.timestamp && (
                           <div className="text-sm text-gray-500">
-                            {new Date(s.timestamp).toLocaleTimeString()}
+                            {new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
                       </div>
@@ -464,6 +465,7 @@ const SessionPage = () => {
                         >
                           Delete
                         </button>
+
                       </div>
                     </div>
                   </div>

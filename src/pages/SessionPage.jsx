@@ -35,7 +35,7 @@ const SessionPage = () => {
     })();
   }, [sessionId]);
 
-  // Load sets belonging to this session
+  // Load sets and fetch exercise names
   useEffect(() => {
     if (!session) return;
     const ids = session.set_ids || [];
@@ -43,15 +43,34 @@ const SessionPage = () => {
       setSets([]);
       return;
     }
-    const q = query(collection(db, "sets"), where("__name__", "in", ids));
     (async () => {
-      const snap = await getDocs(q);
-      // Build array of set objects
-      const setsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort by timestamp descending (most recent first)
-      setsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      // Finally update state
-      setSets(setsData);
+      // Fetch sets
+      const setQuery = query(collection(db, "sets"), where("__name__", "in", ids));
+      const setSnap = await getDocs(setQuery);
+      const setsData = setSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Fetch exercise docs to get names
+      const exIds = [...new Set(setsData.map(s => s.exerciseId))];
+      const exMap = {};
+      if (exIds.length > 0) {
+        const exQuery = query(collection(db, "exercises"), where("__name__", "in", exIds));
+        const exSnap = await getDocs(exQuery);
+        exSnap.docs.forEach(d => {
+          const { name } = d.data();
+          exMap[d.id] = name;
+        });
+      }
+
+      // Enrich sets with exerciseName
+      const enrichedSets = setsData.map(s => ({
+        ...s,
+        exerciseName: exMap[s.exerciseId] || "Unknown Exercise",
+      }));
+
+      // Sort by timestamp descending
+      enrichedSets.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      setSets(enrichedSets);
     })();
   }, [session]);
 
@@ -168,6 +187,13 @@ const SessionPage = () => {
         />
       </div>
 
+      {/* New set form */}
+      <NewSetForm
+        sessionId={sessionId}
+        sessionCategory={session.category || ""}
+        onCreated={handleNewSet}
+      />
+
       {/* Sets list */}
       <section>
         <h2 className="text-xl mb-2">Sets</h2>
@@ -177,7 +203,8 @@ const SessionPage = () => {
           <ul className="space-y-4">
             {sets.map(s => (
               <li key={s.id} className="border p-2 rounded">
-                <div>Exercise: {s.exerciseId}</div>
+                <br />
+                <div>Exercise: {s.exerciseName}</div>
                 <div>Reps: {s.rep_count}</div>
                 <div>Intensity: {s.intensity}</div>
                 <div>Weight: {s.resistanceWeight}</div>
@@ -188,14 +215,8 @@ const SessionPage = () => {
             ))}
           </ul>
         )}
-      </section>
 
-      {/* New set form */}
-      <NewSetForm
-        sessionId={sessionId}
-        sessionCategory={session.category || ""}
-        onCreated={handleNewSet}
-      />
+      </section>
     </div>
   );
 };

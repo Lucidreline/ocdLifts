@@ -46,7 +46,12 @@ const SessionPage = () => {
     const q = query(collection(db, "sets"), where("__name__", "in", ids));
     (async () => {
       const snap = await getDocs(q);
-      setSets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // Build array of set objects
+      const setsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort by timestamp descending (most recent first)
+      setsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      // Finally update state
+      setSets(setsData);
     })();
   }, [session]);
 

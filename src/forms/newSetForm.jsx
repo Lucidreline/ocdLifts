@@ -1,155 +1,152 @@
-import React, { useState, useEffect } from "react";
-import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
+// src/forms/newSetForm.jsx
+import React, { useEffect, useState } from "react";
+import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
-const NewSetForm = ({ sessionId, sessionCategory, onCreated }) => {
-  const [data, setData] = useState({
-    rep_count: "",
-    intensity: "",
-    exerciseId: "",
-    resistanceWeight: "",
-    resistanceHeight: "",
-    set_notes: "",
-  });
+const NewSetForm = ({
+  sessionId,
+  sessionCategory,
+  defaultExerciseId,
+  onExerciseChange,
+  onCreated,
+}) => {
+  const [exerciseId, setExerciseId] = useState(defaultExerciseId || "");
   const [exercises, setExercises] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const [repCount, setRepCount] = useState("");
+  const [intensity, setIntensity] = useState("");
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
+  const [notes, setNotes] = useState("");
 
-  // Fetch session category then load exercises matching that category
+  // Whenever sessionCategory changes, fetch the dropdown list of exercises of that category
   useEffect(() => {
-    // if no category yet, clear list
     if (!sessionCategory) {
       setExercises([]);
+      setExerciseId("");
       return;
     }
-
     (async () => {
-      // fetch only exercises matching the new category
       const q = query(
         collection(db, "exercises"),
         where("category", "==", sessionCategory)
       );
       const snap = await getDocs(q);
-      setExercises(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    })();
-  }, [sessionCategory]);
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setExercises(data);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setData((prev) => ({ ...prev, [name]: value }));
-  };
+      // If the last selected ID isn’t in this category’s list, clear out
+      if (defaultExerciseId) {
+        const found = data.find((e) => e.id === defaultExerciseId);
+        if (!found) setExerciseId("");
+      }
+    })();
+  }, [sessionCategory, defaultExerciseId]);
+
+  // If parent tells us to switch the default exerciseId, update local state
+  useEffect(() => {
+    if (defaultExerciseId) {
+      setExerciseId(defaultExerciseId);
+    }
+  }, [defaultExerciseId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
+    if (!exerciseId) return;
 
-    try {
-      const payload = {
-        ...data,
-        timestamp: new Date().toISOString(),
-        sessionId,
-      };
-      const docRef = await addDoc(collection(db, "sets"), payload);
-      onCreated(docRef.id);
-      // reset form
-      setData({
-        rep_count: "",
-        intensity: "",
-        exerciseId: "",
-        resistanceWeight: "",
-        resistanceHeight: "",
-        set_notes: "",
-      });
-    } catch (err) {
-      console.error("Error saving set:", err);
-    } finally {
-      setSaving(false);
-    }
+    // Build payload and create new set
+    const payload = {
+      sessionId,
+      exerciseId,
+      rep_count: repCount ? Number(repCount) : null,
+      intensity: intensity ? Number(intensity) : null,
+      resistanceWeight: weight ? Number(weight) : null,
+      resistanceHeight: height ? Number(height) : null,
+      set_notes: notes,
+      timestamp: new Date().toISOString(),
+    };
+    const docRef = await addDoc(collection(db, "sets"), payload);
+
+    // Notify parent (SessionPage) that a set was created, so it can re‐load + check PR
+    onCreated(docRef.id);
+
+    // Also pass back the chosen exercise ID so it becomes the “lastExerciseId”
+    onExerciseChange(exerciseId);
+
+    // Clear form (keep the same exerciseId for subsequent sets)
+    setRepCount("");
+    setIntensity("");
+    setWeight("");
+    setHeight("");
+    setNotes("");
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 border-t">
-      <h3 className="text-lg font-medium">New Set</h3>
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <div>
+        <label className="block mb-1">Exercise</label>
+        <select
+          value={exerciseId}
+          onChange={(e) => {
+            setExerciseId(e.target.value);
+            onExerciseChange(e.target.value);
+          }}
+          className="w-full p-2 border rounded"
+        >
+          <option value="">— select exercise —</option>
+          {exercises.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.name} {e.variation && `(${e.variation})`}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {/* Exercise selector filtered by session category */}
-        <div className="col-span-2">
-          <label className="block mb-1">Exercise</label>
-          <select
-            name="exerciseId"
-            value={data.exerciseId}
-            onChange={handleChange}
-            required
-            className="w-full p-2 border rounded"
-          >
-            <option value="">— select exercise —</option>
-            {exercises.map((ex) => (
-              <option key={ex.id} value={ex.id}>
-                {ex.name}
-                {ex.variation ? ` (${ex.variation})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Reps */}
+      <div className="grid grid-cols-3 gap-2">
         <input
-          name="rep_count"
           type="number"
           placeholder="Reps"
-          value={data.rep_count}
-          onChange={handleChange}
+          value={repCount}
+          onChange={(e) => setRepCount(e.target.value)}
           className="p-2 border rounded"
-          min="0"
         />
-        {/* Intensity */}
         <input
-          name="intensity"
           type="number"
-          placeholder="Intensity 1–10"
-          value={data.intensity}
-          onChange={handleChange}
+          placeholder="Intensity"
+          value={intensity}
+          onChange={(e) => setIntensity(e.target.value)}
           className="p-2 border rounded"
-          min="1"
-          max="10"
         />
-
-        {/* Weight */}
         <input
-          name="resistanceWeight"
           type="number"
           placeholder="Weight"
-          value={data.resistanceWeight}
-          onChange={handleChange}
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
           className="p-2 border rounded"
         />
-        {/* Height */}
         <input
-          name="resistanceHeight"
           type="number"
           placeholder="Height"
-          value={data.resistanceHeight}
-          onChange={handleChange}
+          value={height}
+          onChange={(e) => setHeight(e.target.value)}
           className="p-2 border rounded"
         />
+      </div>
 
-        {/* Notes */}
+      <div>
         <input
-          name="set_notes"
+          type="text"
           placeholder="Notes"
-          value={data.set_notes}
-          onChange={handleChange}
-          className="p-2 border rounded col-span-2"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full p-2 border rounded"
         />
       </div>
 
       <button
         type="submit"
-        disabled={saving}
-        className={`w-full py-2 text-white rounded ${
-          saving ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
-        }`}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
       >
-        {saving ? "Adding…" : "Add Set"}
+        Add Set
       </button>
     </form>
   );

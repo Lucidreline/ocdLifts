@@ -4,18 +4,19 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
   collection,
   getDocs,
   query,
   where,
   arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { useParams } from "react-router-dom";
 import { db } from "../firebase/firebase";
 
 import NewSetForm from "../forms/newSetForm";
 
-// Session categories for dropdown
 const sessionCategories = ["Push", "Pull", "Legs"];
 
 const SessionPage = () => {
@@ -23,19 +24,28 @@ const SessionPage = () => {
   const [session, setSession] = useState(null);
   const [sets, setSets] = useState([]);
   const [prMessage, setPrMessage] = useState("");
+  const [lastExerciseId, setLastExerciseId] = useState(null);
 
-  // Load session data
+  // Load session metadata on mount
   useEffect(() => {
     (async () => {
       const snap = await getDoc(doc(db, "sessions", sessionId));
       if (snap.exists()) {
         const data = snap.data();
-        setSession({ id: snap.id, pr_hit: data.pr_hit || false, ...data });
+        setSession({
+          id: snap.id,
+          pr_hit: data.pr_hit || false,
+          body_weight: data.body_weight || null,
+          session_notes: data.session_notes || "",
+          category: data.category || "",
+          set_ids: data.set_ids || [],
+          date: data.date || "",
+        });
       }
     })();
   }, [sessionId]);
 
-  // Load sets belonging to this session
+  // Load sets and fetch exercise names
   useEffect(() => {
     if (!session) return;
     const ids = session.set_ids || [];
@@ -43,37 +53,47 @@ const SessionPage = () => {
       setSets([]);
       return;
     }
-    const q = query(collection(db, "sets"), where("__name__", "in", ids));
     (async () => {
-      const snap = await getDocs(q);
-      setSets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const setQuery = query(collection(db, "sets"), where("__name__", "in", ids));
+      const setSnap = await getDocs(setQuery);
+      const setsData = setSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      const exIds = [...new Set(setsData.map((s) => s.exerciseId))];
+      const exMap = {};
+      if (exIds.length > 0) {
+        const exQuery = query(collection(db, "exercises"), where("__name__", "in", exIds));
+        const exSnap = await getDocs(exQuery);
+        exSnap.docs.forEach((d) => {
+          const data = d.data();
+          exMap[d.id] = data.name;
+        });
+      }
+
+      const enriched = setsData.map((s) => ({
+        ...s,
+        exerciseName: exMap[s.exerciseId] || "Unknown Exercise",
+      }));
+      enriched.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      setSets(enriched);
     })();
   }, [session]);
 
-  // Generic session field updater
-  const handleFieldUpdate = field => async e => {
-    const value = e.target.type === "number"
-      ? e.target.value === ""
-        ? null
-        : parseFloat(e.target.value)
-      : e.target.value;
-    setSession(s => ({ ...s, [field]: value }));
+  // Update a single session field
+  const handleFieldUpdate = (field) => async (e) => {
+    const raw = e.target.value;
+    const value = e.target.type === "number" ? (raw === "" ? null : parseFloat(raw)) : raw;
+    setSession((prev) => ({ ...prev, [field]: value }));
     await updateDoc(doc(db, "sessions", sessionId), { [field]: value });
   };
 
   // Add new set and detect PR
-  const handleNewSet = async setId => {
-    // Add set reference to session
-    await updateDoc(doc(db, "sessions", sessionId), {
-      set_ids: arrayUnion(setId),
-    });
-    setSession(s => ({ ...s, set_ids: [...(s.set_ids || []), setId] }));
+  const handleNewSet = async (setId) => {
+    await updateDoc(doc(db, "sessions", sessionId), { set_ids: arrayUnion(setId) });
+    setSession((prev) => ({ ...prev, set_ids: [...(prev.set_ids || []), setId] }));
 
-    // Fetch new set data
     const setSnap = await getDoc(doc(db, "sets", setId));
     const { exerciseId, rep_count, intensity, resistanceWeight, resistanceHeight } = setSnap.data();
 
-    // Fetch current PR from exercise
     const exSnap = await getDoc(doc(db, "exercises", exerciseId));
     const exData = exSnap.data() || {};
     const currentPr = {
@@ -82,10 +102,10 @@ const SessionPage = () => {
       resistanceHeight: exData.pr?.resistanceHeight ?? 0,
     };
 
-    // Determine PR
-    const hadNoPrBefore = currentPr.reps === 0 && currentPr.resistanceWeight === 0 && currentPr.resistanceHeight === 0;
+    const hadNoPr = currentPr.reps === 0 && currentPr.resistanceWeight === 0 && currentPr.resistanceHeight === 0;
     const anyValue = rep_count > 0 || resistanceWeight > 0 || resistanceHeight > 0;
-    let isPr = hadNoPrBefore && anyValue;
+    let isPr = hadNoPr && anyValue;
+
     if (!isPr) {
       const isWeightPr =
         resistanceWeight > currentPr.resistanceWeight &&
@@ -109,14 +129,23 @@ const SessionPage = () => {
         resistanceHeight,
         lastUpdated: new Date().toISOString(),
       };
-      // Update exercise PR
       await updateDoc(doc(db, "exercises", exerciseId), { pr: newPr });
-      // Flag session PR
       await updateDoc(doc(db, "sessions", sessionId), { pr_hit: true });
-      setSession(s => ({ ...s, pr_hit: true }));
+      setSession((prev) => ({ ...prev, pr_hit: true }));
       setPrMessage(`🎉 New PR! ${rep_count} reps, ${resistanceWeight}lbs, ${resistanceHeight} height`);
       setTimeout(() => setPrMessage(""), 5000);
     }
+  };
+
+  // Delete a set: remove from Firestore and from session.set_ids
+  const handleDeleteSet = async (setId) => {
+    // 1) Remove the document from "sets" collection
+    await deleteDoc(doc(db, "sets", setId));
+    // 2) Remove the setId from the session's set_ids array
+    await updateDoc(doc(db, "sessions", sessionId), { set_ids: arrayRemove(setId) });
+    // 3) Update local state: filter out the deleted set
+    setSets((prev) => prev.filter((s) => s.id !== setId));
+    setSession((prev) => ({ ...prev, set_ids: prev.set_ids.filter((id) => id !== setId) }));
   };
 
   if (!session) return <p>Loading session…</p>;
@@ -124,73 +153,83 @@ const SessionPage = () => {
   return (
     <div className="p-6 max-w-xl mx-auto space-y-6">
       <h1 className="text-2xl">Session: {session.category || "Uncategorized"}</h1>
-
       {session.pr_hit && <div className="text-green-600 font-bold">🎉 PR Hit This Session!</div>}
       {prMessage && <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 rounded">{prMessage}</div>}
 
-      {/* Session metadata */}
       <div>
         <label className="block mb-1">Body Weight (lbs)</label>
         <input
           type="number"
           step="any"
-          value={session.body_weight || ""}
+          value={session.body_weight ?? ""}
+          placeholder="e.g. 195.5"
           onChange={handleFieldUpdate("body_weight")}
           className="w-full p-2 border rounded"
-          placeholder="e.g. 195.5"
         />
       </div>
       <div>
         <label className="block mb-1">Category</label>
         <select
-          value={session.category || ""}
+          value={session.category}
           onChange={handleFieldUpdate("category")}
           className="w-full p-2 border rounded"
         >
           <option value="">— select —</option>
-          {sessionCategories.map(cat => (
-            <option key={cat} value={cat}>{cat}</option>
+          {sessionCategories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
           ))}
         </select>
       </div>
       <div>
         <label className="block mb-1">Notes</label>
         <textarea
-          value={session.session_notes || ""}
+          rows={3}
+          value={session.session_notes}
           onChange={handleFieldUpdate("session_notes")}
           className="w-full p-2 border rounded"
-          rows={3}
         />
       </div>
 
-      {/* Sets list */}
+      <NewSetForm
+        sessionId={sessionId}
+        sessionCategory={session.category}
+        defaultExerciseId={lastExerciseId}
+        onExerciseChange={(id) => setLastExerciseId(id)}
+        onCreated={handleNewSet}
+      />
+
       <section>
         <h2 className="text-xl mb-2">Sets</h2>
         {sets.length === 0 ? (
           <p>No sets yet.</p>
         ) : (
           <ul className="space-y-4">
-            {sets.map(s => (
-              <li key={s.id} className="border p-2 rounded">
-                <div>Exercise: {s.exerciseId}</div>
-                <div>Reps: {s.rep_count}</div>
-                <div>Intensity: {s.intensity}</div>
-                <div>Weight: {s.resistanceWeight}</div>
-                <div>Height: {s.resistanceHeight}</div>
-                <div>Notes: {s.set_notes}</div>
-                <div className="text-sm text-gray-500">{new Date(s.timestamp).toLocaleTimeString()}</div>
+            {sets.map((s) => (
+              <li key={s.id} className="border p-2 rounded space-y-1">
+                {s.exerciseName && <div>Exercise: {s.exerciseName}</div>}
+                {s.rep_count != null && <div>Reps: {s.rep_count}</div>}
+                {s.intensity != null && <div>Intensity: {s.intensity}</div>}
+                {s.resistanceWeight != null && <div>Weight: {s.resistanceWeight}</div>}
+                {s.resistanceHeight != null && <div>Height: {s.resistanceHeight}</div>}
+                {s.set_notes && <div>Notes: {s.set_notes}</div>}
+                {s.timestamp && (
+                  <div className="text-sm text-gray-500">
+                    {new Date(s.timestamp).toLocaleTimeString()}
+                  </div>
+                )}
+                <button
+                  onClick={() => handleDeleteSet(s.id)}
+                  className="mt-1 text-red-600 hover:underline text-sm"
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>
         )}
       </section>
-
-      {/* New set form */}
-      <NewSetForm
-        sessionId={sessionId}
-        sessionCategory={session.category || ""}
-        onCreated={handleNewSet}
-      />
     </div>
   );
 };

@@ -1,13 +1,13 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
+import NavBar from "./components/navBar";
 import DashboardPage from "./pages/DashboardPage";
 import ExercisePage from "./pages/ExercisesPage";
 import SessionsPage from "./pages/SessionsPage";
 import SessionPage from "./pages/SessionPage";
 import BulkPage from './pages/BulkPage';
 
-import NavBar from "./other_components/navBar";
 
 function App() {
   return (

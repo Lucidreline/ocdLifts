@@ -1,7 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import NavBar from "./other_components/navBar";
+import NavBar from "./components/navBar";
 import DashboardPage from "./pages/DashboardPage";
 import ExercisePage from "./pages/ExercisesPage";
 import SessionsPage from "./pages/SessionsPage";

@@ -77,9 +77,7 @@ const SessionPage = () => {
   // Generic session field updater
   const handleFieldUpdate = field => async e => {
     const value = e.target.type === "number"
-      ? e.target.value === ""
-        ? null
-        : parseFloat(e.target.value)
+      ? e.target.value === "" ? null : parseFloat(e.target.value)
       : e.target.value;
     setSession(s => ({ ...s, [field]: value }));
     await updateDoc(doc(db, "sessions", sessionId), { [field]: value });
@@ -88,9 +86,7 @@ const SessionPage = () => {
   // Add new set and detect PR
   const handleNewSet = async setId => {
     // Add set reference to session
-    await updateDoc(doc(db, "sessions", sessionId), {
-      set_ids: arrayUnion(setId),
-    });
+    await updateDoc(doc(db, "sessions", sessionId), { set_ids: arrayUnion(setId) });
     setSession(s => ({ ...s, set_ids: [...(s.set_ids || []), setId] }));
 
     // Fetch new set data
@@ -127,15 +123,8 @@ const SessionPage = () => {
     }
 
     if (isPr) {
-      const newPr = {
-        reps: rep_count,
-        resistanceWeight,
-        resistanceHeight,
-        lastUpdated: new Date().toISOString(),
-      };
-      // Update exercise PR
+      const newPr = { reps: rep_count, resistanceWeight, resistanceHeight, lastUpdated: new Date().toISOString() };
       await updateDoc(doc(db, "exercises", exerciseId), { pr: newPr });
-      // Flag session PR
       await updateDoc(doc(db, "sessions", sessionId), { pr_hit: true });
       setSession(s => ({ ...s, pr_hit: true }));
       setPrMessage(`🎉 New PR! ${rep_count} reps, ${resistanceWeight}lbs, ${resistanceHeight} height`);
@@ -202,20 +191,25 @@ const SessionPage = () => {
         ) : (
           <ul className="space-y-4">
             {sets.map(s => (
-              <li key={s.id} className="border p-2 rounded">
+              <>
                 <br />
-                <div>Exercise: {s.exerciseName}</div>
-                <div>Reps: {s.rep_count}</div>
-                <div>Intensity: {s.intensity}</div>
-                <div>Weight: {s.resistanceWeight}</div>
-                <div>Height: {s.resistanceHeight}</div>
-                <div>Notes: {s.set_notes}</div>
-                <div className="text-sm text-gray-500">{new Date(s.timestamp).toLocaleTimeString()}</div>
-              </li>
+                <li key={s.id} className="border p-2 rounded">
+                  {s.exerciseName && <div>Exercise: {s.exerciseName}</div>}
+                  {s.rep_count != null && <div>Reps: {s.rep_count}</div>}
+                  {s.intensity != 0 && <div>Intensity: {s.intensity}</div>}
+                  {s.resistanceWeight != 0 && <div>Weight: {s.resistanceWeight}</div>}
+                  {s.resistanceHeight != 0 && <div>Height: {s.resistanceHeight}</div>}
+                  {s.set_notes && <div>Notes: {s.set_notes}</div>}
+                  {s.timestamp && (
+                    <div className="text-sm text-gray-500">
+                      {new Date(s.timestamp).toLocaleTimeString()}
+                    </div>
+                  )}
+                </li >
+              </>
             ))}
           </ul>
         )}
-
       </section>
     </div>
   );

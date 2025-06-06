@@ -1,4 +1,4 @@
-// not to be confused with the Session (Singular) page
+// src/pages/SessionsPage.jsx
 import React, { useEffect, useState } from "react";
 import {
   collection,
@@ -14,12 +14,17 @@ const SessionsPage = () => {
   const [sessions, setSessions] = useState([]);
   const navigate = useNavigate();
 
-  // fetch sessions
+  // fetch sessions, ordering by date descending
   useEffect(() => {
     (async () => {
       const q = query(collection(db, "sessions"), orderBy("date", "desc"));
       const snap = await getDocs(q);
-      setSessions(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setSessions(
+        snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+      );
     })();
   }, []);
 
@@ -36,6 +41,16 @@ const SessionsPage = () => {
     navigate(`/sessions/${docRef.id}`);
   };
 
+  // helper to format an ISO date as "Month Day, Year"
+  const formatFriendlyDate = (isoString) => {
+    const d = new Date(isoString);
+    return d.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   return (
     <div className="p-6 max-w-xl mx-auto">
       <div className="flex justify-between items-center mb-4">
@@ -43,7 +58,6 @@ const SessionsPage = () => {
         <button
           onClick={handleCreate}
           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          style={{ background: 'rgba(0,255,0,0.3)', outline: '2px solid red' }}
         >
           Create Session
         </button>
@@ -54,13 +68,14 @@ const SessionsPage = () => {
       ) : (
         <ul className="space-y-2">
           {sessions.map((sess) => (
-            <li key={sess.id} className="border p-3 rounded hover:bg-gray-50">
+            <li
+              key={sess.id}
+              className="border p-3 rounded hover:bg-gray-50"
+            >
               <Link to={`/sessions/${sess.id}`} className="block">
                 <div className="font-medium">
-                  {sess.category || "Uncategorized"}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {new Date(sess.date).toLocaleString()}
+                  {sess.category || "Uncategorized"} {" - "}
+                  {formatFriendlyDate(sess.date)}
                 </div>
               </Link>
             </li>

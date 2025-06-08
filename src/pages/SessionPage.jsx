@@ -201,7 +201,9 @@ const SessionPage = () => {
         reps: rep_count,
         resistanceWeight,
         resistanceHeight,
+        pr_set_id: setId,
         lastUpdated: new Date().toISOString(),
+
       };
       await updateDoc(doc(db, "exercises", exerciseId), { pr: newPr });
       await updateDoc(doc(db, "sessions", sessionId), { pr_hit: true });

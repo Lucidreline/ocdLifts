@@ -7,6 +7,7 @@ import ExercisePage from "./pages/ExercisesPage";
 import SessionsPage from "./pages/SessionsPage";
 import SessionPage from "./pages/SessionPage";
 import BulkPage from './pages/BulkPage';
+import MuscleGroupsPage from "./pages/MuscleGroups";
 
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
         <Route path="/exercises" element={<ExercisePage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/bulk" element={<BulkPage />} />
+        <Route path="/muscle-groups/:groupSlug" element={<MuscleGroupsPage />} />
 
 
         {/* Catch-all back to dashboard */}

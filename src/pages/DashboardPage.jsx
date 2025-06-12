@@ -1,9 +1,6 @@
 // src/pages/DashboardPage.jsx
 import React, { useEffect, useState } from "react";
-import {
-  collection,
-  getDocs
-} from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import {
   BarChart,
@@ -12,7 +9,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from "recharts";
 
 const DashboardPage = () => {
@@ -26,31 +23,34 @@ const DashboardPage = () => {
   );
   const [chartData, setChartData] = useState([]);
 
-  // Fetch all exercises once
+  // Load all exercises
   useEffect(() => {
     (async () => {
       const snap = await getDocs(collection(db, "exercises"));
       const map = {};
       snap.docs.forEach((d) => {
-        const data = d.data();
-        map[d.id] = data;
+        map[d.id] = {
+          category: d.data().category,
+          primary: d.data().primaryMuscleGroup,
+          secondary: d.data().secondaryMuscleGroup,
+          third: d.data().thirdMuscleGroup,
+        };
       });
       setExercisesMap(map);
     })();
   }, []);
 
-  // Recompute chart data whenever filters or exercisesMap change
+  // Recompute chart data when filters change
   useEffect(() => {
     if (!Object.keys(exercisesMap).length) return;
 
     (async () => {
-      // Fetch all sets
       const snap = await getDocs(collection(db, "sets"));
       const sets = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
       const start = new Date(startDate);
-      // Count by muscle group
       const counts = {};
+
       sets.forEach((s) => {
         if (!s.timestamp) return;
         const t = new Date(s.timestamp);
@@ -60,19 +60,33 @@ const DashboardPage = () => {
         if (!ex) return;
         if (categoryFilter !== "All" && ex.category !== categoryFilter) return;
 
-        const groups = [
-          ex.primaryMuscleGroup,
-          ex.secondaryMuscleGroup,
-          ex.thirdMuscleGroup
-        ].filter(Boolean);
-        groups.forEach((group) => {
-          const val = metricFilter === "sets" ? 1 : s.rep_count || 0;
-          counts[group] = (counts[group] || 0) + val;
-        });
+        const val = metricFilter === "sets" ? 1 : s.rep_count || 0;
+
+        // Primary count
+        if (ex.primary) {
+          if (!counts[ex.primary]) counts[ex.primary] = { primary: 0, secondary: 0, third: 0 };
+          counts[ex.primary].primary += val;
+        }
+        // Secondary count
+        if (ex.secondary) {
+          if (!counts[ex.secondary]) counts[ex.secondary] = { primary: 0, secondary: 0, third: 0 };
+          counts[ex.secondary].secondary += val;
+        }
+        // Third count
+        if (ex.third) {
+          if (!counts[ex.third]) counts[ex.third] = { primary: 0, secondary: 0, third: 0 };
+          counts[ex.third].third += val;
+        }
       });
 
-      // Transform to array
-      const data = Object.entries(counts).map(([group, value]) => ({ group, value }));
+      const data = Object.entries(counts).map(([group, vals]) => ({
+        group,
+        primary: vals.primary,
+        secondary: vals.secondary,
+        third: vals.third,
+      }));
+
+
       setChartData(data);
     })();
   }, [exercisesMap, categoryFilter, metricFilter, startDate]);
@@ -81,7 +95,6 @@ const DashboardPage = () => {
     <div className="p-6 max-w-xl mx-auto">
       <h1 className="text-2xl mb-4">Workout Volume Dashboard</h1>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-6">
         <div>
           <label className="block mb-1">Category:</label>
@@ -120,15 +133,19 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* Chart */}
       <div style={{ width: "100%", height: 300 }}>
         <ResponsiveContainer>
-          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <BarChart
+            data={chartData}
+            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="group" />
             <YAxis />
             <Tooltip />
-            <Bar dataKey="value" fill="#4A90E2" />
+            <Bar dataKey="primary" stackId="a" fill="#8884d8" />
+            <Bar dataKey="secondary" stackId="a" fill="#82ca9d" />
+            <Bar dataKey="third" stackId="a" fill="#ffc658" />
           </BarChart>
         </ResponsiveContainer>
       </div>

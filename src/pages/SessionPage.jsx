@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { useParams } from "react-router-dom";
 import { db } from "../firebase/firebase";
+import { isNewPR } from "../utils/prUtils";
 
 import NewSetForm from "../forms/newSetForm";
 
@@ -169,15 +170,7 @@ const SessionPage = () => {
     };
 
     // e) Determine if it’s a PR
-    const hadNoPrBefore =
-      currentPr.reps === 0 &&
-      currentPr.resistanceWeight === 0 &&
-      currentPr.resistanceHeight === 0;
-    const anyValue =
-      (rep_count ?? 0) > 0 ||
-      (resistanceWeight ?? 0) > 0 ||
-      (resistanceHeight ?? 0) > 0;
-    let isPr = hadNoPrBefore && anyValue;
+    let isPr = isNewPR(currentPr, { rep_count, resistanceWeight, resistanceHeight });
 
     if (!isPr) {
       const isWeightPr =

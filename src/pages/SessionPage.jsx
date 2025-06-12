@@ -17,6 +17,12 @@ import { db } from "../firebase/firebase";
 import { isNewPR } from "../utils/prUtils";
 
 import NewSetForm from "../forms/newSetForm";
+import {
+  mapSessionDoc,
+  extractExerciseIds,
+  buildExerciseMap,
+  enrichAndSortSets,
+} from "../utils/sessionUtils";
 
 const sessionCategories = ["Push", "Pull", "Legs"];
 
@@ -46,16 +52,7 @@ const SessionPage = () => {
     (async () => {
       const snap = await getDoc(doc(db, "sessions", sessionId));
       if (snap.exists()) {
-        const data = snap.data();
-        setSession({
-          id: snap.id,
-          pr_hit: data.pr_hit || false,
-          body_weight: data.body_weight ?? null,
-          session_notes: data.session_notes || "",
-          category: data.category || "",
-          set_ids: data.set_ids || [],
-          date: data.date || "",
-        });
+        setSession(mapSessionDoc(snap.id, snap.data()));
       }
     })();
   }, [sessionId]);
@@ -93,30 +90,22 @@ const SessionPage = () => {
 
     // Fetch sets
     const setQuery = query(collection(db, "sets"), where("__name__", "in", ids));
-    const setSnap = await getDocs(setQuery);
-    const setsData = setSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const setSnap = await getDocs(
+      query(collection(db, "sets"), where("__name__", "in", ids))
+    );
+    const setsData = setSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     // Gather unique exercise IDs
-    const exIds = [...new Set(setsData.map((s) => s.exerciseId))];
-    const exMap = {};
-    if (exIds.length > 0) {
-      const exQuery = query(
-        collection(db, "exercises"),
-        where("__name__", "in", exIds)
-      );
-      const exSnap = await getDocs(exQuery);
-      exSnap.docs.forEach((d) => {
-        const data = d.data();
-        exMap[d.id] = data.name;
-      });
-    }
+    const exIds = extractExerciseIds(setsData);
+    const exSnap = await getDocs(
+      query(collection(db, "exercises"), where("__name__", "in", exIds))
+    );
 
-    // Enrich and sort
-    const enriched = setsData.map((s) => ({
-      ...s,
-      exerciseName: exMap[s.exerciseId] || "Unknown Exercise",
-    }));
-    enriched.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // 3) Build a quick map from ID → name/variation
+    const exMap = buildExerciseMap(exSnap.docs);
+
+    // 4) Enrich + sort your sets array
+    const enriched = enrichAndSortSets(setsData, exMap);
 
     setSets(enriched);
   };

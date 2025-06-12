@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -13,6 +14,7 @@ import {
 } from "recharts";
 
 const DashboardPage = () => {
+  const navigate = useNavigate();
   const [exercisesMap, setExercisesMap] = useState({});
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [metricFilter, setMetricFilter] = useState("sets");
@@ -23,7 +25,7 @@ const DashboardPage = () => {
   );
   const [chartData, setChartData] = useState([]);
 
-  // Load all exercises
+  // Fetch exercises
   useEffect(() => {
     (async () => {
       const snap = await getDocs(collection(db, "exercises"));
@@ -40,7 +42,7 @@ const DashboardPage = () => {
     })();
   }, []);
 
-  // Recompute chart data when filters change
+  // Compute chart data
   useEffect(() => {
     if (!Object.keys(exercisesMap).length) return;
 
@@ -62,17 +64,17 @@ const DashboardPage = () => {
 
         const val = metricFilter === "sets" ? 1 : s.rep_count || 0;
 
-        // Primary count
+        // primary
         if (ex.primary) {
           if (!counts[ex.primary]) counts[ex.primary] = { primary: 0, secondary: 0, third: 0 };
           counts[ex.primary].primary += val;
         }
-        // Secondary count
+        // secondary
         if (ex.secondary) {
           if (!counts[ex.secondary]) counts[ex.secondary] = { primary: 0, secondary: 0, third: 0 };
           counts[ex.secondary].secondary += val;
         }
-        // Third count
+        // third
         if (ex.third) {
           if (!counts[ex.third]) counts[ex.third] = { primary: 0, secondary: 0, third: 0 };
           counts[ex.third].third += val;
@@ -86,10 +88,15 @@ const DashboardPage = () => {
         third: vals.third,
       }));
 
-
       setChartData(data);
     })();
   }, [exercisesMap, categoryFilter, metricFilter, startDate]);
+
+  // Handle bar click
+  const handleBarClick = (data) => {
+    const grp = data.group;
+    navigate(`/muscle-groups/${encodeURIComponent(grp)}`);
+  };
 
   return (
     <div className="p-6 max-w-xl mx-auto">
@@ -138,6 +145,11 @@ const DashboardPage = () => {
           <BarChart
             data={chartData}
             margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            onClick={({ activePayload }) => {
+              if (activePayload && activePayload.length) {
+                handleBarClick(activePayload[0].payload);
+              }
+            }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="group" />

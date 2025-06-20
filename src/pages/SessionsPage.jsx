@@ -1,4 +1,5 @@
 // src/pages/SessionsPage.jsx
+import './SessionsPage.styles.scss'
 import React, { useEffect, useState } from "react";
 import {
   collection,
@@ -54,7 +55,7 @@ const SessionsPage = () => {
   return (
     <div className="p-6 max-w-xl mx-auto">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl">Sessions</h1>
+        <h1 className="page-title">Sessions</h1>
         <button
           onClick={handleCreate}
           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -66,11 +67,11 @@ const SessionsPage = () => {
       {sessions.length === 0 ? (
         <p>No sessions yet. Click “Create Session” to get started.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="">
           {sessions.map((sess) => (
             <li
               key={sess.id}
-              className="border p-3 rounded hover:bg-gray-50"
+              className="session-card"
             >
               <Link to={`/sessions/${sess.id}`} className="block">
                 <div className="font-medium">

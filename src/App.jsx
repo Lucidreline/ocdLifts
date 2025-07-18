@@ -8,6 +8,7 @@ import SessionsPage from "./pages/SessionsPage";
 import SessionPage from "./pages/SessionPage";
 import BulkPage from './pages/BulkPage';
 import MuscleGroupsPage from "./pages/MuscleGroups";
+import ExercisesPage from "./pages/ExercisePage";
 
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
 
         <Route path="/sessions/:sessionId" element={<SessionPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path='/exercises/:exerciseId' element={<ExercisesPage />} />
         <Route path="/exercises" element={<ExercisePage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/bulk" element={<BulkPage />} />

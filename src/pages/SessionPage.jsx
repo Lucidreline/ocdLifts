@@ -1,4 +1,5 @@
 // src/pages/SessionPage.jsx
+import './SessionPage.styles.scss'
 import React, { useEffect, useState } from "react";
 import {
   doc,

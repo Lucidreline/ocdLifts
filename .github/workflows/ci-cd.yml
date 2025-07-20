@@ -1,26 +1,62 @@
-deploy:
-  name: 🚀 Deploy to k3s via SSH
-  needs: build-and-push
-  runs-on: ubuntu-latest
+name: CI / CD
 
-  steps:
-    - name: SSH & Deploy
-      uses: appleboy/ssh-action@v0.1.7
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_DEPLOY_KEY }}
-        known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
-        script: |
-          set -e
-          echo "::group::Deploying to k3s"
-          # point kubectl at the master’s k3s config
-          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+on:
+  push:
+    branches: [ master ]
 
-          # update to the :latest image
-          kubectl -n ocdlifts set image deployment/ocdlifts \
-            ocdlifts=lucidreline/ocdlifts:latest
+jobs:
+  test:
+    name: 🧪 Run Vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install deps
+        run: npm ci
+      - name: Run tests
+        run: npm test
 
-          # wait for rollout
-          kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m
-          echo "::endgroup::"
+  build-and-push:
+    name: 🏗️ Build & Push Image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & push multi‑arch image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: |
+            lucidreline/ocdlifts:latest
+
+  deploy:
+    name: 🚀 Deploy to k3s via SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH & Deploy
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_DEPLOY_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          script: |
+            set -e
+            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            kubectl -n ocdlifts set image deployment/ocdlifts \
+              ocdlifts=lucidreline/ocdlifts:latest
+            kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m

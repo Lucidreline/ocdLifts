@@ -6,6 +6,7 @@ on:
       - master
 
 jobs:
+
   test:
     name: 🧪 Run Vitest
     runs-on: ubuntu-latest
@@ -50,25 +51,16 @@ jobs:
 
     steps:
       - name: SSH & Deploy
-        uses: appleboy/ssh-action@v0.1.9
+        uses: appleboy/ssh-action@v0.1.11
         with:
           host: ${{ secrets.SSH_HOST }}
           port: 2222
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
-          # you can remove this if you want to fully disable fingerprint checks
-          fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
-          strict: false
+          # load your known_hosts entry instead of fingerprint
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           script: |
             set -e
-
-            echo "::group::🕵️‍♂️ SSH debug"
-            echo "raw ssh-keyscan output:"
-            ssh-keyscan -p 2222 ${{ secrets.SSH_HOST }} | tee /tmp/keyscan.out
-            echo "parsed fingerprint:"
-            ssh-keyscan -p 2222 ${{ secrets.SSH_HOST }} | ssh-keygen -lf -
-            echo "::endgroup::"
-
             echo "::group::🚀 Deploying to k3s"
             export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
             kubectl -n ocdlifts set image deployment/ocdlifts \

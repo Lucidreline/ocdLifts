@@ -47,7 +47,6 @@ jobs:
     name: 🚀 Deploy to k3s via SSH
     needs: build-and-push
     runs-on: ubuntu-latest
-
     steps:
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v0.1.9
@@ -59,11 +58,9 @@ jobs:
           fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           script: |
             set -e
-            # point kubectl at your k3s config
+            echo "::group::Deploying to k3s"
             export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-
-            # tell k3s to roll out the new image
             kubectl -n ocdlifts set image deployment/ocdlifts \
               ocdlifts=lucidreline/ocdlifts:latest
-
             kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m
+            echo "::endgroup::"

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocdlifts
+  namespace: ocdlifts
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ocdlifts
+  template:
+    metadata:
+      labels:
+        app: ocdlifts
+    spec:
+      containers:
+      - name: ocdlifts
+        image: lucidreline/ocdlifts:latest
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocdlifts
+  namespace: ocdlifts
+spec:
+  type: ClusterIP
+  selector:
+    app: ocdlifts
+  ports:
+  - port: 80
+    targetPort: 80

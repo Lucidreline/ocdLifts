@@ -1,16 +1,27 @@
-# 1. Build the React app
-FROM node:20 AS build
+# 1) Build the React app on ARMv7
+FROM --platform=$BUILDPLATFORM node:18-alpine AS builder
+
+# Install build dependencies for node-sass
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# copy lockfile & install
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# copy source & build
 COPY . .
 RUN npm run build
 
-# 2. Serve with Nginx
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# 2) Serve with nginx
+FROM nginx:stable-alpine
 
-# docker build -t lucidreline/ocd-lifts:latest .
-# docker push lucidreline/ocd-lifts:latest
+# Remove the default config and add ours
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy in the built SPA
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80

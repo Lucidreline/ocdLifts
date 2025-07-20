@@ -51,7 +51,7 @@ jobs:
 
     steps:
       - name: SSH & Deploy
-        uses: appleboy/ssh-action@v0.1.12
+        uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.SSH_HOST }}
           port: 2222

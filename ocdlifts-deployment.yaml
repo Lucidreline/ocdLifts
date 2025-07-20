@@ -16,6 +16,7 @@ spec:
       containers:
       - name: ocdlifts
         image: lucidreline/ocdlifts:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
         readinessProbe:

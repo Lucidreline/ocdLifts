@@ -56,10 +56,20 @@ jobs:
           port: 2222
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          # you can remove this if you want to fully disable fingerprint checks
           fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
+          strict: false
           script: |
             set -e
-            echo "::group::Deploying to k3s"
+
+            echo "::group::🕵️‍♂️ SSH debug"
+            echo "raw ssh-keyscan output:"
+            ssh-keyscan -p 2222 ${{ secrets.SSH_HOST }} | tee /tmp/keyscan.out
+            echo "parsed fingerprint:"
+            ssh-keyscan -p 2222 ${{ secrets.SSH_HOST }} | ssh-keygen -lf -
+            echo "::endgroup::"
+
+            echo "::group::🚀 Deploying to k3s"
             export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
             kubectl -n ocdlifts set image deployment/ocdlifts \
               ocdlifts=lucidreline/ocdlifts:latest

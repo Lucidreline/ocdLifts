@@ -1,32 +1,41 @@
-# 1) Build the React app on ARMv7
+# syntax=docker/dockerfile:1.4
+
+###############################################################################
+# 1) Builder image: compile your React / Vite app + inject prod env variables #
+###############################################################################
+
 FROM --platform=$BUILDPLATFORM node:18-alpine AS builder
 
-# install python3 / make / g++ for node-sass (if you need it)
+# needed by some dependencies (e.g. node‑sass)
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# copy lockfile & install deps
+# 1) copy just lockfiles -> install deps
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# bring in your production env file so Vite picks it up at build time
-COPY .env.production .env.production
+# 2) pull in your secret .env.production as a BuildKit secret
+#    (make sure you have set ENV_PRODUCTION_CONTENT in your repo’s secrets)
+RUN --mount=type=secret,id=prod_env \
+    tee .env.production < /run/secrets/prod_env
 
-# copy all your source (including vite.config.js, src/, public/, etc.)
+# 3) copy the rest of your source & build
 COPY . .
-
-# do the Vite build (will embed those VITE_… vars into the static assets)
 RUN npm run build
 
-# 2) Serve with nginx
+
+###############################################################################
+# 2) Production image: serve the built SPA with nginx                         #
+###############################################################################
+
 FROM nginx:stable-alpine
 
-# remove the stock config & add yours (with your SPA try_files snippet)
+# swap in your custom nginx.conf (must handle SPA history‑mode, etc.)
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# ship the static build into nginx
+# copy built artifacts from the builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80

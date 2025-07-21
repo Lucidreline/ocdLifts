@@ -62,5 +62,5 @@ jobs:
             export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
             kubectl -n ocdlifts set image deployment/ocdlifts \
               ocdlifts=lucidreline/ocdlifts:${{ github.sha }}
-            kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m
+            kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=15m
             echo "::endgroup::"

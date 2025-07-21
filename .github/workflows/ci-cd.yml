@@ -6,7 +6,6 @@ on:
       - master
 
 jobs:
-
   test:
     name: 🧪 Run Vitest
     runs-on: ubuntu-latest
@@ -57,12 +56,11 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
           known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
-        # ← this `script:` must be indented exactly two levels under `with:`
-        script: |
-          set -e
-          echo "::group::🚀 Deploying to k3s"
-          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-          kubectl -n ocdlifts set image deployment/ocdlifts \
-            ocdlifts=lucidreline/ocdlifts:${{ github.sha }}
-          kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m
-          echo "::endgroup::"
+          script: |
+            set -e
+            echo "::group::🚀 Deploying to k3s"
+            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            kubectl -n ocdlifts set image deployment/ocdlifts \
+              ocdlifts=lucidreline/ocdlifts:${{ github.sha }}
+            kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m
+            echo "::endgroup::"

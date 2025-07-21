@@ -15,7 +15,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci
       - name: Run tests
         run: npm test
@@ -41,26 +41,32 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            lucidreline/ocdlifts:${{ github.sha }}
+            lucidreline/ocdlifts:latest
 
   deploy:
     name: 🚀 Deploy to k3s via SSH
     needs: build-and-push
     runs-on: ubuntu-latest
+
     steps:
       - name: SSH & Deploy
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v0.1.13
         with:
           host: ${{ secrets.SSH_HOST }}
           port: 2222
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
+          # use your known_hosts entry instead of fingerprint
           known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           script: |
             set -e
             echo "::group::🚀 Deploying to k3s"
             export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+            # tell k3s to pull & roll out the new image
             kubectl -n ocdlifts set image deployment/ocdlifts \
-              ocdlifts=lucidreline/ocdlifts:${{ github.sha }}
-            kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=15m
+              ocdlifts=lucidreline/ocdlifts:latest
+
+            # wait up to 10 minutes for the rollout
+            kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=10m
             echo "::endgroup::"

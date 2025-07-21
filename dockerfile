@@ -10,6 +10,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+COPY .env.production .
+
 # copy source & build
 COPY . .
 RUN npm run build

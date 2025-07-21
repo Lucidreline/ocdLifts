@@ -41,14 +41,14 @@ jobs:
         with:
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
+          # tag with the commit SHA so each build is unique
           tags: |
-            lucidreline/ocdlifts:latest
+            lucidreline/ocdlifts:${{ github.sha }}
 
   deploy:
     name: 🚀 Deploy to k3s via SSH
     needs: build-and-push
     runs-on: ubuntu-latest
-
     steps:
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v0.1.10
@@ -57,13 +57,17 @@ jobs:
           port: 2222
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_DEPLOY_KEY }}
-          # load your known_hosts entry instead of fingerprint
+          # if you're using known_hosts instead of fingerprint:
           known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
-          script: |
-            set -e
-            echo "::group::🚀 Deploying to k3s"
-            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-            kubectl -n ocdlifts set image deployment/ocdlifts \
-              ocdlifts=lucidreline/ocdlifts:latest
-            kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m
-            echo "::endgroup::"
+        script: |
+          set -e
+          echo "::group::🚀 Deploying to k3s"
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+          # roll out the image we just built (by SHA)
+          kubectl -n ocdlifts set image deployment/ocdlifts \
+            ocdlifts=lucidreline/ocdlifts:${{ github.sha }}
+
+          # wait for the new pods to be up
+          kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=2m
+          echo "::endgroup::"

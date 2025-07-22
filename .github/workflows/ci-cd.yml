@@ -68,7 +68,7 @@ jobs:
           script: |
             set -e
             echo "::group::🚀 Deploying to k3s"
-            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            export KUBECONFIG=~/kubeconfig
             kubectl -n ocdlifts set image deployment/ocdlifts \
               ocdlifts=lucidreline/ocdlifts:latest
             kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=15m

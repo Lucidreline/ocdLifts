@@ -71,5 +71,7 @@ jobs:
             export KUBECONFIG=~/kubeconfig
             kubectl -n ocdlifts set image deployment/ocdlifts \
               ocdlifts=lucidreline/ocdlifts:latest
+            # 👇 Force rollout restart to ensure new image gets pulled
+            kubectl -n ocdlifts rollout restart deployment/ocdlifts
             kubectl -n ocdlifts rollout status deployment/ocdlifts --timeout=15m
             echo "::endgroup::"

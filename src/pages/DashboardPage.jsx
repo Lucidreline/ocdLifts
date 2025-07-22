@@ -100,7 +100,7 @@ const DashboardPage = () => {
 
   return (
     <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl mb-4">test test 123! Workout Volume Dashboard</h1>
+      <h1 className="text-2xl mb-4">PLEASE WORKKKd</h1>
 
       <div className="flex flex-wrap gap-4 mb-6">
         <div>

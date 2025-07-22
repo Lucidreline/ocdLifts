@@ -17,4 +17,9 @@ console.log("API key in use:", import.meta.env.VITE_FIREBASE_API_KEY);
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// ✅ TEMP: expose Firestore to window for debugging in browser console
+if (typeof window !== "undefined") {
+  window.db = db;
+}
+
 export { db };

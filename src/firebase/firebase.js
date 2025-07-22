@@ -1,5 +1,19 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  setDoc,
+  deleteDoc,
+  updateDoc,
+  getDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,9 +31,23 @@ console.log("API key in use:", import.meta.env.VITE_FIREBASE_API_KEY);
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ✅ TEMP: expose Firestore to window for debugging in browser console
+// ✅ Expose db and Firestore functions globally for DevTools debugging
 if (typeof window !== "undefined") {
   window.db = db;
+  window.firestoreHelpers = {
+    collection,
+    getDocs,
+    addDoc,
+    doc,
+    setDoc,
+    deleteDoc,
+    updateDoc,
+    getDoc,
+    query,
+    where,
+    orderBy,
+    onSnapshot,
+  };
 }
 
 export { db };

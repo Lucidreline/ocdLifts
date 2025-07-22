@@ -1,23 +1,24 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
 metadata:
-  name: ocdlifts
+  name: ocdlifts-ingress
   namespace: ocdlifts
   annotations:
-    # Treat the path as a regex
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    # Rewrite anything after “/” back to “/” so the SPA router handles it
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    kubernetes.io/ingress.class: traefik
+    cert-manager.io/cluster-issuer: letsencrypt-http  # ← this line is key
+
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ocdlifts.mancas.me
+      secretName: ocdlifts-tls
   rules:
-  - host: ocdlifts.192-168-0-220.nip.io
-    http:
-      paths:
-      - path: "/(.*)"
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: ocdlifts
-            port:
-              number: 80
+    - host: ocdlifts.mancas.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ocdlifts
+                port:
+                  number: 80

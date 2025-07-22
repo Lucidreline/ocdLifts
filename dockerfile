@@ -29,13 +29,12 @@ RUN npm run build
 # 2) Production image: serve the built SPA with nginx                         #
 ###############################################################################
 
-FROM nginx:stable-alpine
+FROM nginx:alpine
 
 # swap in your custom nginx.conf (must handle SPA history‑mode, etc.)
 RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # copy built artifacts from the builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
-
+COPY nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80

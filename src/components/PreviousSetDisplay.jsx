@@ -1,110 +1,98 @@
-import React, { useEffect, useState } from "react";
-import {
-    collection,
-    query,
-    where,
-    orderBy,
-    limit,
-    getDocs,
-    doc,
-    getDoc,
-} from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import React, { useEffect, useState } from 'react';
+import { db } from '../firebase/firebase';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, limit } from 'firebase/firestore';
 
 const PreviousSetDisplay = ({ exerciseId, session }) => {
     const [loading, setLoading] = useState(true);
-    const [sets, setSets] = useState([]);
-    const [pr, setPr] = useState(null);
+    const [prSet, setPrSet] = useState(null);
+    const [recentSets, setRecentSets] = useState([]);
 
     useEffect(() => {
-        if (!exerciseId || !session?.category) return;
-
-        const fetchPreviousSets = async () => {
+        const fetchData = async () => {
             setLoading(true);
-            try {
-                const q = query(
-                    collection(db, "sets"),
-                    where("exerciseId", "==", exerciseId),
-                    orderBy("timestamp", "desc"),
-                    limit(5)
-                );
-                const snapshot = await getDocs(q);
-                const fetchedSets = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                }));
-                setSets(fetchedSets);
-            } catch (err) {
-                console.error("Failed to fetch previous sets:", err);
-            } finally {
+
+            const exerciseRef = doc(db, 'exercises', exerciseId);
+            const exerciseSnap = await getDoc(exerciseRef);
+
+            if (!exerciseSnap.exists()) {
+                console.warn('Exercise not found');
                 setLoading(false);
+                return;
             }
-        };
 
-        const fetchPr = async () => {
-            try {
-                const exDoc = await getDoc(doc(db, "exercises", exerciseId));
-                if (exDoc.exists()) {
-                    const data = exDoc.data();
-                    const prData = data.pr;
-                    if (prData?.pr_set_id) {
-                        const prSetDoc = await getDoc(doc(db, "sets", prData.pr_set_id));
-                        if (prSetDoc.exists()) {
-                            setPr({
-                                id: prData.pr_set_id,
-                                ...prSetDoc.data(),
-                            });
-                        }
-                    }
+            const prData = exerciseSnap.data()?.pr || {};
+            let prSetData = null;
+
+            if (prData?.pr_set_id) {
+                const prSetSnap = await getDoc(doc(db, 'sets', prData.pr_set_id));
+                if (prSetSnap.exists()) {
+                    const pr = prSetSnap.data();
+                    const date = new Date(pr.timestamp);
+                    const dateStr = date.toLocaleDateString();
+                    prSetData = {
+                        weight: pr.resistanceWeight || 0,
+                        reps: pr.rep_count || 0,
+                        date: dateStr,
+                    };
                 }
-            } catch (err) {
-                console.error("Failed to fetch PR set:", err);
             }
+
+            const q = query(
+                collection(db, 'sets'),
+                where('exerciseId', '==', exerciseId),
+                orderBy('timestamp', 'desc'),
+                limit(5)
+            );
+
+            const querySnapshot = await getDocs(q);
+            const recent = [];
+            querySnapshot.forEach((docSnap) => {
+                const d = docSnap.data();
+                const date = new Date(d.timestamp);
+                recent.push({
+                    id: docSnap.id,
+                    weight: d.resistanceWeight || 0,
+                    reps: d.rep_count || 0,
+                    date: date.toLocaleDateString(),
+                });
+            });
+
+            // Remove PR from recent if it exists
+            const filteredRecent = prSetData
+                ? recent.filter(
+                    (s) =>
+                        !(s.weight === prSetData.weight && s.reps === prSetData.reps && s.date === prSetData.date)
+                )
+                : recent;
+
+            setPrSet(prSetData);
+            setRecentSets(filteredRecent);
+            setLoading(false);
         };
 
-        fetchPreviousSets();
-        fetchPr();
-    }, [exerciseId, session?.category]);
+        if (exerciseId && session?.category) {
+            fetchData();
+        }
+    }, [exerciseId, session]);
 
-    const formatSet = (set, label = "") => {
-        const date = new Date(set.timestamp);
-        const dateStr = date.toLocaleDateString();
-        const timeStr = date.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-
-        return (
-            <li key={set.id} style={{ whiteSpace: "pre-line" }}>
-                <strong>{label}</strong>
-                {`${set.resistanceWeight || 0}lbs × ${set.rep_count || 0} reps\n${dateStr} ${timeStr}`}
-            </li>
-        );
-    };
+    if (loading) return <p>Loading previous data…</p>;
 
     return (
-        <div className="previous-set-display mb-6">
-            <h3 className="text-lg font-semibold mb-2">Previous Data</h3>
-
-            {loading && <p>Loading previous data…</p>}
-
-            {!loading && sets.length === 0 && <p>No previous sets found.</p>}
-
-            {!loading && sets.length > 0 && (
-                <ul className="mb-4">
-                    {sets.map((set) =>
-                        pr && pr.id === set.id
-                            ? formatSet(set, "🏆 PR\n")
-                            : formatSet(set)
-                    )}
-                </ul>
+        <div>
+            <h2 className="text-xl font-bold mt-4 mb-2">Previous Sets</h2>
+            {prSet && (
+                <div>
+                    <span role="img" aria-label="trophy">🏆</span> <strong>PR!</strong>
+                    <p>{prSet.weight} lbs × {prSet.reps} reps on {prSet.date}</p>
+                </div>
             )}
-
-            {pr && !sets.find((s) => s.id === pr.id) && (
-                <ul className="mb-4">
-                    {formatSet(pr, "🏆 PR\n")}
-                </ul>
-            )}
+            <ul className="mt-2">
+                {recentSets.map((set, index) => (
+                    <li key={index}>
+                        {set.weight} lbs × {set.reps} reps on {set.date}
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 };

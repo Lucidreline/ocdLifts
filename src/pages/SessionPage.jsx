@@ -20,7 +20,7 @@ const SessionPage = () => {
   const [session, setSession] = useState(null);
   const [sets, setSets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedExerciseId, setSelectedExerciseId] = useState(null); // new!
+  const [selectedExerciseId, setSelectedExerciseId] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'sessions', sessionId), async (docSnapshot) => {
@@ -40,8 +40,7 @@ const SessionPage = () => {
         return;
       }
 
-      const exerciseMap = {}; // { [exerciseId]: { bestSet, isBodyweight } }
-
+      const exerciseMap = {};
       const fetchedSets = await Promise.all(
         sessionData.set_ids.map(async (setId) => {
           const setDoc = await getDoc(doc(db, 'sets', setId));
@@ -92,7 +91,8 @@ const SessionPage = () => {
         .map((s) => ({
           ...s,
           display: `${s.isPR ? 'PR! ' : ''}${s.name}\n${s.weight}lbs for ${s.reps} reps\n${s.time}`,
-        }));
+        }))
+        .reverse(); // ✅ Reverse for most recent first
 
       setSets(finalSets);
       setLoading(false);
@@ -180,7 +180,6 @@ const SessionPage = () => {
               </React.Fragment>
             ))}
           </ul>
-
         ) : (
           <p>No sets recorded yet.</p>
         )}

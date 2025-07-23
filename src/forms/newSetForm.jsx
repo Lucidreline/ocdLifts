@@ -1,14 +1,22 @@
 // src/forms/newSetForm.jsx
 import React, { useEffect, useState } from "react";
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  doc,
+  updateDoc,
+  arrayUnion,
+} from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
 const NewSetForm = ({
-  sessionId,
-  sessionCategory,
+  session,
   defaultExerciseId,
-  onExerciseChange,
-  onCreated,
+  onExerciseChange = () => { },
+  onCreated = () => { },
 }) => {
   const [exerciseId, setExerciseId] = useState(defaultExerciseId || "");
   const [exercises, setExercises] = useState([]);
@@ -18,31 +26,29 @@ const NewSetForm = ({
   const [height, setHeight] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Whenever sessionCategory changes, fetch the dropdown list of exercises of that category
+  // Load exercises that match session category
   useEffect(() => {
-    if (!sessionCategory) {
+    if (!session?.category) {
       setExercises([]);
-      setExerciseId("");
       return;
     }
     (async () => {
       const q = query(
         collection(db, "exercises"),
-        where("category", "==", sessionCategory)
+        where("category", "==", session.category)
       );
       const snap = await getDocs(q);
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setExercises(data);
 
-      // If the last selected ID isn’t in this category’s list, clear out
+      // Validate existing selection
       if (defaultExerciseId) {
         const found = data.find((e) => e.id === defaultExerciseId);
         if (!found) setExerciseId("");
       }
     })();
-  }, [sessionCategory, defaultExerciseId]);
+  }, [session?.category, defaultExerciseId]);
 
-  // If parent tells us to switch the default exerciseId, update local state
   useEffect(() => {
     if (defaultExerciseId) {
       setExerciseId(defaultExerciseId);
@@ -51,11 +57,10 @@ const NewSetForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!exerciseId) return;
+    if (!exerciseId || !session?.id) return;
 
-    // Build payload and create new set
     const payload = {
-      sessionId,
+      sessionId: session.id,
       exerciseId,
       rep_count: repCount ? Number(repCount) : null,
       intensity: intensity ? Number(intensity) : null,
@@ -64,20 +69,27 @@ const NewSetForm = ({
       set_notes: notes,
       timestamp: new Date().toISOString(),
     };
-    const docRef = await addDoc(collection(db, "sets"), payload);
 
-    // Notify parent (SessionPage) that a set was created, so it can re‐load + check PR
-    onCreated(docRef.id);
+    try {
+      const docRef = await addDoc(collection(db, "sets"), payload);
 
-    // Also pass back the chosen exercise ID so it becomes the “lastExerciseId”
-    onExerciseChange(exerciseId);
+      // Add the new set ID to the session's set_ids array
+      await updateDoc(doc(db, "sessions", session.id), {
+        set_ids: arrayUnion(docRef.id),
+      });
 
-    // Clear form (keep the same exerciseId for subsequent sets)
-    setRepCount("");
-    setIntensity("");
-    setWeight("");
-    setHeight("");
-    setNotes("");
+      onCreated(docRef.id);
+      onExerciseChange(exerciseId);
+
+      // Reset
+      setRepCount("");
+      setIntensity("");
+      setWeight("");
+      setHeight("");
+      setNotes("");
+    } catch (error) {
+      console.error("Failed to create set or update session:", error);
+    }
   };
 
   return (
@@ -132,15 +144,13 @@ const NewSetForm = ({
         />
       </div>
 
-      <div>
-        <input
-          type="text"
-          placeholder="Notes"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="w-full p-2 border rounded"
-        />
-      </div>
+      <input
+        type="text"
+        placeholder="Notes"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
 
       <button
         type="submit"

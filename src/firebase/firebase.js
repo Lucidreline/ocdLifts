@@ -25,7 +25,7 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-console.log("Vite mode:", import.meta.env.MODE);
+console.log("Vite mode:", import.meta.env);
 console.log("API key in use:", import.meta.env.VITE_FIREBASE_API_KEY);
 console.log("API key in use:", import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 console.log("API key in use:", import.meta.env.VITE_FIREBASE_PROJECT_ID);

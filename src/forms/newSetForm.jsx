@@ -1,4 +1,3 @@
-// src/forms/newSetForm.jsx
 import React, { useEffect, useState } from "react";
 import {
   collection,
@@ -9,8 +8,10 @@ import {
   doc,
   updateDoc,
   arrayUnion,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { isNewPR, calculatePerformanceScore } from "../utils/prUtils";
 
 const NewSetForm = ({
   session,
@@ -26,7 +27,6 @@ const NewSetForm = ({
   const [height, setHeight] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Load exercises that match session category
   useEffect(() => {
     if (!session?.category) {
       setExercises([]);
@@ -41,7 +41,6 @@ const NewSetForm = ({
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setExercises(data);
 
-      // Validate existing selection
       if (defaultExerciseId) {
         const found = data.find((e) => e.id === defaultExerciseId);
         if (!found) setExerciseId("");
@@ -59,7 +58,8 @@ const NewSetForm = ({
     e.preventDefault();
     if (!exerciseId || !session?.id) return;
 
-    const payload = {
+    const timestamp = new Date().toISOString();
+    const newSet = {
       sessionId: session.id,
       exerciseId,
       rep_count: repCount ? Number(repCount) : null,
@@ -67,28 +67,58 @@ const NewSetForm = ({
       resistanceWeight: weight ? Number(weight) : null,
       resistanceHeight: height ? Number(height) : null,
       set_notes: notes,
-      timestamp: new Date().toISOString(),
+      timestamp,
     };
 
     try {
-      const docRef = await addDoc(collection(db, "sets"), payload);
+      const exerciseRef = doc(db, "exercises", exerciseId);
+      const exerciseSnap = await getDoc(exerciseRef);
+      const exercise = exerciseSnap.data();
+      const isBodyweight = exercise.bodyweight_exercise === true;
 
-      // Add the new set ID to the session's set_ids array
+      let hit_pr = false;
+
+      if (exercise?.pr) {
+        const prevBest = {
+          rep_count: exercise.pr.reps,
+          resistanceWeight: exercise.pr.resistanceWeight,
+        };
+        hit_pr = isNewPR(prevBest, newSet, session.bodyWeight, isBodyweight);
+      } else {
+        hit_pr = true; // No previous PR, so first entry is PR
+      }
+
+      newSet.hit_pr = hit_pr;
+
+      const setRef = await addDoc(collection(db, "sets"), newSet);
+
       await updateDoc(doc(db, "sessions", session.id), {
-        set_ids: arrayUnion(docRef.id),
+        set_ids: arrayUnion(setRef.id),
       });
 
-      onCreated(docRef.id);
+      if (hit_pr) {
+        await updateDoc(exerciseRef, {
+          pr: {
+            reps: newSet.rep_count,
+            resistanceWeight: isBodyweight
+              ? session.bodyWeight + (newSet.resistanceWeight || 0)
+              : newSet.resistanceWeight || 0,
+            pr_set_id: setRef.id,
+            lastUpdated: timestamp,
+          },
+        });
+      }
+
+      onCreated(setRef.id);
       onExerciseChange(exerciseId);
 
-      // Reset
       setRepCount("");
       setIntensity("");
       setWeight("");
       setHeight("");
       setNotes("");
     } catch (error) {
-      console.error("Failed to create set or update session:", error);
+      console.error("Failed to create set or update session/exercise:", error);
     }
   };
 

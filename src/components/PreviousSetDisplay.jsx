@@ -66,6 +66,22 @@ const PreviousSetDisplay = ({ exerciseId, session }) => {
         fetchPr();
     }, [exerciseId, session?.category]);
 
+    const formatSet = (set, label = "") => {
+        const date = new Date(set.timestamp);
+        const dateStr = date.toLocaleDateString();
+        const timeStr = date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+
+        return (
+            <li key={set.id} style={{ whiteSpace: "pre-line" }}>
+                <strong>{label}</strong>
+                {`${set.resistanceWeight || 0}lbs × ${set.rep_count || 0} reps\n${dateStr} ${timeStr}`}
+            </li>
+        );
+    };
+
     return (
         <div className="previous-set-display mb-6">
             <h3 className="text-lg font-semibold mb-2">Previous Data</h3>
@@ -76,37 +92,18 @@ const PreviousSetDisplay = ({ exerciseId, session }) => {
 
             {!loading && sets.length > 0 && (
                 <ul className="mb-4">
-                    {sets.map((set) => {
-                        const date = new Date(set.timestamp);
-                        const dateStr = date.toLocaleDateString();
-                        const timeStr = date.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                        });
-
-                        return (
-                            <li key={set.id} style={{ whiteSpace: "pre-line" }}>
-                                {`${set.resistanceWeight || 0}lbs × ${set.rep_count || 0} reps\n${dateStr} ${timeStr}`}
-                            </li>
-                        );
-                    })}
+                    {sets.map((set) =>
+                        pr && pr.id === set.id
+                            ? formatSet(set, "🏆 PR\n")
+                            : formatSet(set)
+                    )}
                 </ul>
             )}
 
-            {pr && (
-                <div>
-                    <h4 className="text-md font-medium">Current PR</h4>
-                    <p>
-                        {pr.resistanceWeight || 0}lbs × {pr.rep_count || 0} reps
-                    </p>
-                    <p>
-                        {new Date(pr.timestamp).toLocaleDateString()}{" "}
-                        {new Date(pr.timestamp).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                        })}
-                    </p>
-                </div>
+            {pr && !sets.find((s) => s.id === pr.id) && (
+                <ul className="mb-4">
+                    {formatSet(pr, "🏆 PR\n")}
+                </ul>
             )}
         </div>
     );

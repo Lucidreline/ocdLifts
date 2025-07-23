@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import PreviousSetDisplay from "../components/PreviousSetDisplay";
 import { calculatePerformanceScore } from '../utils/prUtils';
+import SessionMuscleChart from "../components/SessionMuscleChart";
+
 
 import { useParams } from 'react-router-dom';
 import {
@@ -159,6 +161,13 @@ const SessionPage = () => {
           />
         </label>
       </div>
+
+      {session.category && (
+        <div>
+          <h2>Last 7 Days – {session.category} Volume</h2>
+          <SessionMuscleChart category={session.category} />
+        </div>
+      )}
 
       <NewSetForm
         session={session}

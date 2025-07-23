@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import PreviousSetDisplay from "../components/PreviousSetDisplay";
 import { calculatePerformanceScore } from '../utils/prUtils';
+import SessionMuscleChart from "../components/SessionMuscleChart";
+
 
 import { useParams } from 'react-router-dom';
 import {
@@ -21,6 +23,8 @@ const SessionPage = () => {
   const [sets, setSets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedExerciseId, setSelectedExerciseId] = useState(null);
+  const [muscleChartRefreshKey, setMuscleChartRefreshKey] = useState(0);
+
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'sessions', sessionId), async (docSnapshot) => {
@@ -160,9 +164,17 @@ const SessionPage = () => {
         </label>
       </div>
 
+      {session.category && (
+        <div>
+          <h2>Last 7 Days – {session.category} Volume</h2>
+          <SessionMuscleChart category={session.category} refreshKey={muscleChartRefreshKey} />
+        </div>
+      )}
+
       <NewSetForm
         session={session}
         onExerciseChange={(id) => setSelectedExerciseId(id)}
+        onCreated={() => setMuscleChartRefreshKey((prev) => prev + 1)}
       />
 
       {selectedExerciseId && (

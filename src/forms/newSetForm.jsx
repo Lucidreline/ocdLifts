@@ -1,17 +1,7 @@
+// src/forms/newSetForm.jsx
 import React, { useEffect, useState } from "react";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  doc,
-  updateDoc,
-  arrayUnion,
-  getDoc,
-} from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
-import { isNewPR, calculatePerformanceScore } from "../utils/prUtils";
 
 const NewSetForm = ({
   session,
@@ -27,20 +17,19 @@ const NewSetForm = ({
   const [height, setHeight] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Load exercises matching session category
   useEffect(() => {
     if (!session?.category) {
       setExercises([]);
       return;
     }
     (async () => {
-      const q = query(
-        collection(db, "exercises"),
-        where("category", "==", session.category)
-      );
+      const q = query(collection(db, "exercises"), where("category", "==", session.category));
       const snap = await getDocs(q);
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setExercises(data);
 
+      // Validate existing selection
       if (defaultExerciseId) {
         const found = data.find((e) => e.id === defaultExerciseId);
         if (!found) setExerciseId("");
@@ -58,8 +47,13 @@ const NewSetForm = ({
     e.preventDefault();
     if (!exerciseId || !session?.id) return;
 
-    const timestamp = new Date().toISOString();
-    const newSet = {
+    const selectedExercise = exercises.find((e) => e.id === exerciseId);
+    const confirm = window.confirm(
+      `${selectedExercise?.name || 'Unknown Exercise'} right??`
+    );
+    if (!confirm) return;
+
+    const payload = {
       sessionId: session.id,
       exerciseId,
       rep_count: repCount ? Number(repCount) : null,
@@ -67,59 +61,26 @@ const NewSetForm = ({
       resistanceWeight: weight ? Number(weight) : null,
       resistanceHeight: height ? Number(height) : null,
       set_notes: notes,
-      timestamp,
+      timestamp: new Date().toISOString(),
     };
 
-    try {
-      const exerciseRef = doc(db, "exercises", exerciseId);
-      const exerciseSnap = await getDoc(exerciseRef);
-      const exercise = exerciseSnap.data();
-      const isBodyweight = exercise.bodyweight_exercise === true;
+    const docRef = await addDoc(collection(db, "sets"), payload);
 
-      let hit_pr = false;
+    // Add set ID to session.set_ids
+    const sessionRef = doc(db, "sessions", session.id);
+    await updateDoc(sessionRef, {
+      set_ids: [...(session.set_ids || []), docRef.id],
+    });
 
-      if (exercise?.pr) {
-        const prevBest = {
-          rep_count: exercise.pr.reps,
-          resistanceWeight: exercise.pr.resistanceWeight,
-        };
-        hit_pr = isNewPR(prevBest, newSet, session.bodyWeight, isBodyweight);
-      } else {
-        hit_pr = true; // No previous PR, so first entry is PR
-      }
+    onCreated(docRef.id);
+    onExerciseChange(exerciseId);
 
-      newSet.hit_pr = hit_pr;
-
-      const setRef = await addDoc(collection(db, "sets"), newSet);
-
-      await updateDoc(doc(db, "sessions", session.id), {
-        set_ids: arrayUnion(setRef.id),
-      });
-
-      if (hit_pr) {
-        await updateDoc(exerciseRef, {
-          pr: {
-            reps: newSet.rep_count,
-            resistanceWeight: isBodyweight
-              ? session.bodyWeight + (newSet.resistanceWeight || 0)
-              : newSet.resistanceWeight || 0,
-            pr_set_id: setRef.id,
-            lastUpdated: timestamp,
-          },
-        });
-      }
-
-      onCreated(setRef.id);
-      onExerciseChange(exerciseId);
-
-      setRepCount("");
-      setIntensity("");
-      setWeight("");
-      setHeight("");
-      setNotes("");
-    } catch (error) {
-      console.error("Failed to create set or update session/exercise:", error);
-    }
+    // Reset fields (not exerciseId)
+    setRepCount("");
+    setIntensity("");
+    setWeight("");
+    setHeight("");
+    setNotes("");
   };
 
   return (
@@ -165,13 +126,13 @@ const NewSetForm = ({
           onChange={(e) => setWeight(e.target.value)}
           className="p-2 border rounded"
         />
-        <input
+        {/* <input
           type="number"
           placeholder="Height"
           value={height}
           onChange={(e) => setHeight(e.target.value)}
           className="p-2 border rounded"
-        />
+        /> */}
       </div>
 
       <input

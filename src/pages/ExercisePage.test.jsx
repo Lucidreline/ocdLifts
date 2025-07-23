@@ -12,19 +12,25 @@ vi.mock('react-router-dom', () => ({
   useNavigate: vi.fn(),
 }));
 
-// Mock Firestore functions
-vi.mock('firebase/firestore', () => ({
-  initializeApp: vi.fn(),
-  getFirestore: vi.fn(),
-  doc: vi.fn(),
-  getDoc: vi.fn(),
-  updateDoc: vi.fn(),
-  deleteDoc: vi.fn(),
-  collection: vi.fn(),
-  query: vi.fn(),
-  where: vi.fn(),
-  getDocs: vi.fn(),
-}));
+// Mock Firestore functions with vi.importActual to avoid missing exports like "addDoc"
+vi.mock('firebase/firestore', async () => {
+  const actual = await vi.importActual('firebase/firestore');
+  return {
+    ...actual,
+    initializeApp: vi.fn(),
+    getFirestore: vi.fn(),
+    doc: vi.fn(),
+    getDoc: vi.fn(),
+    updateDoc: vi.fn(),
+    deleteDoc: vi.fn(),
+    collection: vi.fn(),
+    query: vi.fn(),
+    where: vi.fn(),
+    getDocs: vi.fn(),
+    addDoc: vi.fn(), // ✅ this fixes the "No 'addDoc'" export error
+  };
+});
+
 
 describe('ExercisePage', () => {
   let navigateMock;

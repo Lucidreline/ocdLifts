@@ -1,35 +1,38 @@
-import { describe, it, expect } from 'vitest'
-import { isNewPR } from './prUtils'
+import { describe, it, expect } from 'vitest';
+import { isNewPR, calculatePerformanceScore } from './prUtils';
 
-describe('isNewPR utility', () => {
-  it('flags first-ever PR when stats go from zero', () => {
-    expect(isNewPR(
-      { reps: 0, resistanceWeight: 0, resistanceHeight: 0 },
-      { rep_count: 5, resistanceWeight: 0, resistanceHeight: 0 }
-    )).toBe(true)
-  })
+describe('calculatePerformanceScore', () => {
+  it('calculates correctly for weighted exercise', () => {
+    const set = { rep_count: 5, resistanceWeight: 20 };
+    expect(calculatePerformanceScore(set)).toBe(100);
+  });
 
-  it('flags reps-only PR', () => {
-    const current = { reps: 5, resistanceWeight: 50, resistanceHeight: 0 }
-    const nextSet = { rep_count: 6, resistanceWeight: 50, resistanceHeight: 0 }
-    expect(isNewPR(current, nextSet)).toBe(true)
-  })
+  it('includes bodyweight if bodyweight exercise', () => {
+    const set = { rep_count: 5, resistanceWeight: 10 };
+    expect(calculatePerformanceScore(set, 150, true)).toBe(800); // (150+10)*5
+  });
 
-  it('flags weight-only PR', () => {
-    const current = { reps: 5, resistanceWeight: 50, resistanceHeight: 0 }
-    const nextSet = { rep_count: 5, resistanceWeight: 55, resistanceHeight: 0 }
-    expect(isNewPR(current, nextSet)).toBe(true)
-  })
+  it('ignores bodyweight if not flagged', () => {
+    const set = { rep_count: 5, resistanceWeight: 10 };
+    expect(calculatePerformanceScore(set, 150, false)).toBe(50);
+  });
+});
 
-  it('flags height-only PR', () => {
-    const current = { reps: 5, resistanceWeight: 50, resistanceHeight: 0 }
-    const nextSet = { rep_count: 5, resistanceWeight: 50, resistanceHeight: 10 }
-    expect(isNewPR(current, nextSet)).toBe(true)
-  })
+describe('isNewPR', () => {
+  const prevSet = { rep_count: 5, resistanceWeight: 50 };
+  const newSet = { rep_count: 6, resistanceWeight: 50 };
 
-  it('does not flag a non-PR', () => {
-    const current = { reps: 5, resistanceWeight: 50, resistanceHeight: 0 }
-    const nextSet = { rep_count: 4, resistanceWeight: 50, resistanceHeight: 0 }
-    expect(isNewPR(current, nextSet)).toBe(false)
-  })
-})
+  it('detects PR from better performance', () => {
+    expect(isNewPR(prevSet, newSet)).toBe(true);
+  });
+
+  it('respects bodyweight for bodyweight exercises', () => {
+    const prev = { rep_count: 5, resistanceWeight: 0 };
+    const next = { rep_count: 5, resistanceWeight: 10 };
+    expect(isNewPR(prev, next, 150, true)).toBe(true); // 150 vs 160 per rep
+  });
+
+  it('does not flag if equal or worse', () => {
+    expect(isNewPR(prevSet, prevSet)).toBe(false);
+  });
+});

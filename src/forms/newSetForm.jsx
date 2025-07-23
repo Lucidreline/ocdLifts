@@ -1,14 +1,23 @@
-// src/forms/newSetForm.jsx
 import React, { useEffect, useState } from "react";
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  doc,
+  updateDoc,
+  arrayUnion,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { isNewPR, calculatePerformanceScore } from "../utils/prUtils";
 
 const NewSetForm = ({
-  sessionId,
-  sessionCategory,
+  session,
   defaultExerciseId,
-  onExerciseChange,
-  onCreated,
+  onExerciseChange = () => { },
+  onCreated = () => { },
 }) => {
   const [exerciseId, setExerciseId] = useState(defaultExerciseId || "");
   const [exercises, setExercises] = useState([]);
@@ -18,31 +27,27 @@ const NewSetForm = ({
   const [height, setHeight] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Whenever sessionCategory changes, fetch the dropdown list of exercises of that category
   useEffect(() => {
-    if (!sessionCategory) {
+    if (!session?.category) {
       setExercises([]);
-      setExerciseId("");
       return;
     }
     (async () => {
       const q = query(
         collection(db, "exercises"),
-        where("category", "==", sessionCategory)
+        where("category", "==", session.category)
       );
       const snap = await getDocs(q);
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setExercises(data);
 
-      // If the last selected ID isn’t in this category’s list, clear out
       if (defaultExerciseId) {
         const found = data.find((e) => e.id === defaultExerciseId);
         if (!found) setExerciseId("");
       }
     })();
-  }, [sessionCategory, defaultExerciseId]);
+  }, [session?.category, defaultExerciseId]);
 
-  // If parent tells us to switch the default exerciseId, update local state
   useEffect(() => {
     if (defaultExerciseId) {
       setExerciseId(defaultExerciseId);
@@ -51,33 +56,70 @@ const NewSetForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!exerciseId) return;
+    if (!exerciseId || !session?.id) return;
 
-    // Build payload and create new set
-    const payload = {
-      sessionId,
+    const timestamp = new Date().toISOString();
+    const newSet = {
+      sessionId: session.id,
       exerciseId,
       rep_count: repCount ? Number(repCount) : null,
       intensity: intensity ? Number(intensity) : null,
       resistanceWeight: weight ? Number(weight) : null,
       resistanceHeight: height ? Number(height) : null,
       set_notes: notes,
-      timestamp: new Date().toISOString(),
+      timestamp,
     };
-    const docRef = await addDoc(collection(db, "sets"), payload);
 
-    // Notify parent (SessionPage) that a set was created, so it can re‐load + check PR
-    onCreated(docRef.id);
+    try {
+      const exerciseRef = doc(db, "exercises", exerciseId);
+      const exerciseSnap = await getDoc(exerciseRef);
+      const exercise = exerciseSnap.data();
+      const isBodyweight = exercise.bodyweight_exercise === true;
 
-    // Also pass back the chosen exercise ID so it becomes the “lastExerciseId”
-    onExerciseChange(exerciseId);
+      let hit_pr = false;
 
-    // Clear form (keep the same exerciseId for subsequent sets)
-    setRepCount("");
-    setIntensity("");
-    setWeight("");
-    setHeight("");
-    setNotes("");
+      if (exercise?.pr) {
+        const prevBest = {
+          rep_count: exercise.pr.reps,
+          resistanceWeight: exercise.pr.resistanceWeight,
+        };
+        hit_pr = isNewPR(prevBest, newSet, session.bodyWeight, isBodyweight);
+      } else {
+        hit_pr = true; // No previous PR, so first entry is PR
+      }
+
+      newSet.hit_pr = hit_pr;
+
+      const setRef = await addDoc(collection(db, "sets"), newSet);
+
+      await updateDoc(doc(db, "sessions", session.id), {
+        set_ids: arrayUnion(setRef.id),
+      });
+
+      if (hit_pr) {
+        await updateDoc(exerciseRef, {
+          pr: {
+            reps: newSet.rep_count,
+            resistanceWeight: isBodyweight
+              ? session.bodyWeight + (newSet.resistanceWeight || 0)
+              : newSet.resistanceWeight || 0,
+            pr_set_id: setRef.id,
+            lastUpdated: timestamp,
+          },
+        });
+      }
+
+      onCreated(setRef.id);
+      onExerciseChange(exerciseId);
+
+      setRepCount("");
+      setIntensity("");
+      setWeight("");
+      setHeight("");
+      setNotes("");
+    } catch (error) {
+      console.error("Failed to create set or update session/exercise:", error);
+    }
   };
 
   return (
@@ -132,15 +174,13 @@ const NewSetForm = ({
         />
       </div>
 
-      <div>
-        <input
-          type="text"
-          placeholder="Notes"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="w-full p-2 border rounded"
-        />
-      </div>
+      <input
+        type="text"
+        placeholder="Notes"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
 
       <button
         type="submit"

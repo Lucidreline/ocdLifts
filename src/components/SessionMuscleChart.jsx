@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { db } from "../firebase/firebase";
 
-const SessionMuscleChart = ({ category }) => {
+const SessionMuscleChart = ({ category, refreshKey = 0 }) => {
     const [chartData, setChartData] = useState([]);
     const [metric, setMetric] = useState("sets");
 
@@ -77,7 +77,7 @@ const SessionMuscleChart = ({ category }) => {
         };
 
         fetchData();
-    }, [category, metric]);
+    }, [category, metric, refreshKey]);
 
     return (
         <div className="my-6">

@@ -51,3 +51,4 @@ if (typeof window !== "undefined") {
 }
 
 export { db };
+window.firebaseDb = db;

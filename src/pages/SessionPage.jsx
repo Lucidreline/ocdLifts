@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import PreviousSetDisplay from "../components/PreviousSetDisplay";
 import { useParams } from 'react-router-dom';
 import {
   getDoc,
@@ -17,6 +18,7 @@ const SessionPage = () => {
   const [session, setSession] = useState(null);
   const [sets, setSets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedExerciseId, setSelectedExerciseId] = useState(null); // new!
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'sessions', sessionId), async (docSnapshot) => {
@@ -121,24 +123,31 @@ const SessionPage = () => {
         </label>
       </div>
 
-      <NewSetForm session={session} />
+      <NewSetForm
+        session={session}
+        onExerciseChange={(id) => setSelectedExerciseId(id)}
+      />
+
+      {selectedExerciseId && (
+        <PreviousSetDisplay exerciseId={selectedExerciseId} session={session} />
+      )}
 
       <div className="sets-list">
         <h2>Sets</h2>
         {sets.length > 0 ? (
           <ul>
             {sets.map((s) => (
-              <>
-                <li key={s.id} style={{ whiteSpace: "pre-line" }}>{s.display}</li>
+              <React.Fragment key={s.id}>
+                <li style={{ whiteSpace: "pre-line" }}>{s.display}</li>
                 <br />
-              </>
+              </React.Fragment>
             ))}
           </ul>
         ) : (
           <p>No sets recorded yet.</p>
         )}
       </div>
-    </div >
+    </div>
   );
 };
 

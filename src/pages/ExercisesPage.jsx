@@ -8,6 +8,9 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 
+import BulkExerciseUpdater from '../components/BulkExerciseUpdater';
+
+
 const ExercisesPage = () => {
   const [exercises, setExercises] = useState([]);
   const [newExercise, setNewExercise] = useState({
@@ -198,5 +201,7 @@ const ExercisesPage = () => {
     </div>
   );
 };
+
+<BulkExerciseUpdater />
 
 export default ExercisesPage;

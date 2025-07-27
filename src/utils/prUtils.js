@@ -1,16 +1,14 @@
 // src/utils/prUtils.js
 
-export const calculatePerformanceScore = (set, bodyWeight = 0, isBodyweight = false) => {
+export const calculatePerformanceScore = (set) => {
   const reps = set.rep_count || 0;
-  const resistance = isBodyweight
-    ? bodyWeight + (set.resistanceWeight || 0)
-    : set.resistanceWeight || 0;
-
+  // Treat 0-lb resistance as 1 lb to allow scoring for unweighted exercises
+  const resistance = set.resistanceWeight > 0 ? set.resistanceWeight : 1;
   return reps * resistance;
 };
 
-export const isNewPR = (prevBestSet, newSet, bodyWeight = 0, isBodyweight = false) => {
-  const prevScore = calculatePerformanceScore(prevBestSet, bodyWeight, isBodyweight);
-  const newScore = calculatePerformanceScore(newSet, bodyWeight, isBodyweight);
+export const isNewPR = (prevBestSet, newSet) => {
+  const prevScore = calculatePerformanceScore(prevBestSet);
+  const newScore = calculatePerformanceScore(newSet);
   return newScore > prevScore;
 };

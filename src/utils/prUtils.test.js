@@ -7,32 +7,38 @@ describe('calculatePerformanceScore', () => {
     expect(calculatePerformanceScore(set)).toBe(100);
   });
 
-  it('includes bodyweight if bodyweight exercise', () => {
-    const set = { rep_count: 5, resistanceWeight: 10 };
-    expect(calculatePerformanceScore(set, 150, true)).toBe(800); // (150+10)*5
+  it('treats 0 weight as 1 lb for scoring', () => {
+    const set = { rep_count: 5, resistanceWeight: 0 };
+    expect(calculatePerformanceScore(set)).toBe(5); // 5 * 1
   });
 
-  it('ignores bodyweight if not flagged', () => {
-    const set = { rep_count: 5, resistanceWeight: 10 };
-    expect(calculatePerformanceScore(set, 150, false)).toBe(50);
+  it('treats missing weight as 1 lb for scoring', () => {
+    const set = { rep_count: 5 };
+    expect(calculatePerformanceScore(set)).toBe(5); // 5 * 1
   });
 });
 
 describe('isNewPR', () => {
-  const prevSet = { rep_count: 5, resistanceWeight: 50 };
-  const newSet = { rep_count: 6, resistanceWeight: 50 };
-
   it('detects PR from better performance', () => {
+    const prevSet = { rep_count: 5, resistanceWeight: 50 };
+    const newSet = { rep_count: 6, resistanceWeight: 50 };
     expect(isNewPR(prevSet, newSet)).toBe(true);
   });
 
-  it('respects bodyweight for bodyweight exercises', () => {
-    const prev = { rep_count: 5, resistanceWeight: 0 };
-    const next = { rep_count: 5, resistanceWeight: 10 };
-    expect(isNewPR(prev, next, 150, true)).toBe(true); // 150 vs 160 per rep
+  it('does not flag as PR if equal performance', () => {
+    const set = { rep_count: 5, resistanceWeight: 50 };
+    expect(isNewPR(set, set)).toBe(false);
   });
 
-  it('does not flag if equal or worse', () => {
-    expect(isNewPR(prevSet, prevSet)).toBe(false);
+  it('detects PR correctly when previous set has 0 weight', () => {
+    const prevSet = { rep_count: 10, resistanceWeight: 0 }; // score: 10
+    const newSet = { rep_count: 5, resistanceWeight: 3 };  // score: 15
+    expect(isNewPR(prevSet, newSet)).toBe(true);
+  });
+
+  it('does not detect PR when new set has 0 weight and lower score', () => {
+    const prevSet = { rep_count: 10, resistanceWeight: 3 }; // score: 30
+    const newSet = { rep_count: 10, resistanceWeight: 0 };  // score: 10
+    expect(isNewPR(prevSet, newSet)).toBe(false);
   });
 });

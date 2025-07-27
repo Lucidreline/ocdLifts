@@ -198,10 +198,10 @@ const ExercisesPage = () => {
           {exercise.name}
         </div>
       ))}
+      <BulkExerciseUpdater />
     </div>
   );
 };
 
-<BulkExerciseUpdater />
 
 export default ExercisesPage;
